@@ -48,8 +48,7 @@ class Predictor(BasePredictor):
         # filepath = f'uploads/{filename}'
         filepath = filename
 
-        transcription_df = self.speech_to_text(self,
-            filepath, num_speakers, prompt)
+        transcription_df = self.speech_to_text(filepath, num_speakers, prompt)
         # print for testing
         print(transcription_df)
 
@@ -63,7 +62,7 @@ class Predictor(BasePredictor):
         return json.dumps(result_list)
 
 
-    def convert_time(secs):
+    def convert_time(self, secs):
         return datetime.timedelta(seconds=round(secs))
 
 
