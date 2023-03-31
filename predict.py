@@ -1,5 +1,5 @@
 # Prediction interface for Cog ⚙️
-from cog import BasePredictor, Input, Path
+from cog import BasePredictor, Input, Path, BaseModel
 import os
 import time
 import json
@@ -15,10 +15,11 @@ from pyannote.audio import Audio
 from pyannote.core import Segment
 from sklearn.cluster import AgglomerativeClustering
 from pyannote.audio.pipelines.speaker_verification import PretrainedSpeakerEmbedding
+from typing import Optional, Any
+
 
 class ModelOutput(BaseModel):
     segments: Any
-
 
 class Predictor(BasePredictor):
     def setup(self):
@@ -51,20 +52,16 @@ class Predictor(BasePredictor):
 
         # filepath = f'uploads/{filename}'
         filepath = filename
-
-        transcription_df = self.speech_to_text(filepath, num_speakers, prompt)
+        transcription = self.speech_to_text(filepath, num_speakers, prompt)
         # print for testing
-        print(transcription_df)
+        print(transcription)
 
         os.remove(filepath)
         print(f'{filepath} removed, done with inference')
-        # Return the results as a dictionary
-        # Convert DataFrame to list of dictionaries
-        result_list = transcription_df.to_dict('records')
 
         # Return the results as a JSON object
         return ModelOutput(
-            segments= json.dumps(result_list)
+            segments=transcription
         )
 
 
@@ -127,25 +124,27 @@ class Predictor(BasePredictor):
                 segments[i]["speaker"] = 'SPEAKER ' + str(labels[i] + 1)
 
             # Make output
-            objects = {
-                'start': [],
-                'end': [],
-                'speaker': [],
-                'text': []
-            }
+            output = []  # Initialize an empty list for the output
             text = ''
             for (i, segment) in enumerate(segments):
                 if i == 0 or segments[i - 1]["speaker"] != segment["speaker"]:
-                    objects['start'].append(str(self.convert_time(segment["start"])))
-                    objects['speaker'].append(segment["speaker"])
                     if i != 0:
-                        objects['end'].append(
-                            str(self.convert_time(segments[i - 1]["end"])))
-                        objects['text'].append(text)
+                        # Append the previous speaker segment to the output list
+                        output.append({
+                            'start': str(self.convert_time(segments[i - 1]["start"])),
+                            'end': str(self.convert_time(segments[i - 1]["end"])),
+                            'speaker': segments[i - 1]["speaker"],
+                            'text': text.strip()
+                        })
                         text = ''
                 text += segment["text"] + ' '
-            objects['end'].append(str(self.convert_time(segments[i - 1]["end"])))
-            objects['text'].append(text)
+            # Append the last speaker segment to the output list
+            output.append({
+                'start': str(self.convert_time(segments[i - 1]["start"])),
+                'end': str(self.convert_time(segments[i - 1]["end"])),
+                'speaker': segments[i - 1]["speaker"],
+                'text': text.strip()
+            })
 
             print("done with embedding")
             time_end = time.time()
@@ -154,7 +153,7 @@ class Predictor(BasePredictor):
             system_info = f"""-----Processing time: {time_diff:.5} seconds-----"""
             print(system_info)
             os.remove(audio_file_wav)
-            return pd.DataFrame(objects)
+            return output
 
         except Exception as e:
             os.remove(audio_file_wav)
