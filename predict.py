@@ -15,7 +15,7 @@ from pyannote.audio import Audio
 from pyannote.core import Segment
 from sklearn.cluster import AgglomerativeClustering
 from pyannote.audio.pipelines.speaker_verification import PretrainedSpeakerEmbedding
-from typing import Optional, Any
+from typing import Any
 
 
 class ModelOutput(BaseModel):
@@ -125,26 +125,14 @@ class Predictor(BasePredictor):
 
             # Make output
             output = []  # Initialize an empty list for the output
-            text = ''
-            for (i, segment) in enumerate(segments):
-                if i == 0 or segments[i - 1]["speaker"] != segment["speaker"]:
-                    if i != 0:
-                        # Append the previous speaker segment to the output list
-                        output.append({
-                            'start': str(self.convert_time(segments[i - 1]["start"])),
-                            'end': str(self.convert_time(segments[i - 1]["end"])),
-                            'speaker': segments[i - 1]["speaker"],
-                            'text': text.strip()
-                        })
-                        text = ''
-                text += segment["text"] + ' '
-            # Append the last speaker segment to the output list
-            output.append({
-                'start': str(self.convert_time(segments[i - 1]["start"])),
-                'end': str(self.convert_time(segments[i - 1]["end"])),
-                'speaker': segments[i - 1]["speaker"],
-                'text': text.strip()
-            })
+            for segment in segments:
+                # Append the segment to the output list
+                output.append({
+                    'start': str(self.convert_time(segment["start"])),
+                    'end': str(self.convert_time(segment["end"])),
+                    'speaker': segment["speaker"],
+                    'text': segment["text"]
+                })
 
             print("done with embedding")
             time_end = time.time()
