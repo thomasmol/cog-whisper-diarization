@@ -16,6 +16,10 @@ from pyannote.core import Segment
 from sklearn.cluster import AgglomerativeClustering
 from pyannote.audio.pipelines.speaker_verification import PretrainedSpeakerEmbedding
 
+class ModelOutput(BaseModel):
+    segments: Any
+
+
 class Predictor(BasePredictor):
     def setup(self):
         """Load the model into memory to make running multiple predictions efficient"""
@@ -33,7 +37,7 @@ class Predictor(BasePredictor):
         ),
         filename: str = Input(description="Filename", default="audio.wav"),
         prompt: str = Input(description="Prompt, to be used as context", default="some prompt"),
-    ) -> Path:
+    ) -> ModelOutput:
         """Run a single prediction on the model"""
         base64file = audio.split(',')[1]
         file_data = base64.b64decode(base64file)
@@ -59,7 +63,9 @@ class Predictor(BasePredictor):
         result_list = transcription_df.to_dict('records')
 
         # Return the results as a JSON object
-        return json.dumps(result_list)
+        return ModelOutput(
+            segments= json.dumps(result_list)
+        )
 
 
     def convert_time(self, secs):
