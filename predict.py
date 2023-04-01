@@ -40,7 +40,7 @@ class Predictor(BasePredictor):
         prompt: str = Input(description="Prompt, to be used as context", default="some prompt"),
     ) -> ModelOutput:
         """Run a single prediction on the model"""
-        base64file = base64file.split(',')[1] if ',' in base64file else base64file
+        base64file = file.split(',')[1] if ',' in file else file
         file_data = base64.b64decode(base64file)
         file_start, file_ending = os.path.splitext(f'{filename}')
 
