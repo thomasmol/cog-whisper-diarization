@@ -32,7 +32,7 @@ class Predictor(BasePredictor):
 
     def predict(
         self,
-        audio: str = Input(description="Base 64 encoded audio file"),
+        file: str = Input(description="Base 64 encoded audio file"),
         num_speakers: int = Input(
             description="Number of speakers", ge=1, le=25, default=2
         ),
@@ -40,7 +40,7 @@ class Predictor(BasePredictor):
         prompt: str = Input(description="Prompt, to be used as context", default="some prompt"),
     ) -> ModelOutput:
         """Run a single prediction on the model"""
-        base64file = audio.split(',')[1]
+        base64file = base64file.split(',')[1] if ',' in base64file else base64file
         file_data = base64.b64decode(base64file)
         file_start, file_ending = os.path.splitext(f'{filename}')
 
