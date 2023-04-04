@@ -1,5 +1,5 @@
 # Prediction interface for Cog ⚙️
-from cog import BasePredictor, Input, Path, File, BaseModel
+from cog import BasePredictor, Input, File, BaseModel
 import os
 import time
 import json
@@ -38,17 +38,18 @@ class Predictor(BasePredictor):
         file_string: str = Input(description="Base64 encoded audio file", default=None),
         file_url: str = Input(description="An audio file URL", default=None),
         file: File = Input(description="An audio file", default=None),
+        offset_seconds: int = Input(description="Offset in seconds, used for chunked inputs", default=0),
         num_speakers: int = Input(
             description="Number of speakers", ge=1, le=25, default=2
         ),
         webhook_id: str = Input(description="Webhook ID"),
-        filename: str = Input(description="Filename"),
+        filename: str = Input(description="Filename, only needed if file_string is provided"),
         prompt: str = Input(description="Prompt, to be used as context", default="some people speaking"),
     ) -> ModelOutput:
         """Run a single prediction on the model"""
-        # Check if either filestring, filepath or file is provided
-        if file_string is None and file_url is None and file is None:
-            raise RuntimeError("No audio file provided")
+        # Check if either filestring, filepath or file is provided, but only 1 of them
+        if sum([file_string is not None, file_url is not None, file is not None]) != 1:
+            raise RuntimeError("Provide either file_string, file_url or file")
 
         filepath = ''
         file_start, file_ending = os.path.splitext(f'{filename}')
@@ -73,7 +74,7 @@ class Predictor(BasePredictor):
         file_url = file_url if file_url is not None else ''
 
         filepath = filename
-        transcription = self.speech_to_text(filepath, num_speakers, prompt)
+        transcription = self.speech_to_text(filepath, num_speakers, prompt, offset_seconds)
         # print for testing
         print(transcription)
 
@@ -90,11 +91,11 @@ class Predictor(BasePredictor):
         )
 
 
-    def convert_time(self, secs):
-        return datetime.timedelta(seconds=round(secs))
+    def convert_time(self, secs, offset_seconds=0):
+        return datetime.timedelta(seconds=round(secs) + offset_seconds)
 
 
-    def speech_to_text(self, filepath, num_speakers, prompt):
+    def speech_to_text(self, filepath, num_speakers, prompt, offset_seconds=0):
         # model = whisper.load_model('large-v2')
         time_start = time.time()
 
@@ -153,8 +154,8 @@ class Predictor(BasePredictor):
             for segment in segments:
                 # Append the segment to the output list
                 output.append({
-                    'start': str(self.convert_time(segment["start"])),
-                    'end': str(self.convert_time(segment["end"])),
+                    'start': str(self.convert_time(segment["start"], offset_seconds)),
+                    'end': str(self.convert_time(segment["end"]), offset_seconds),
                     'speaker': segment["speaker"],
                     'text': segment["text"]
                 })
