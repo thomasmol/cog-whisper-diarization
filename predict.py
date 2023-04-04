@@ -9,6 +9,7 @@ import base64
 import whisper
 import datetime
 import contextlib
+import requests
 import numpy as np
 import pandas as pd
 from pyannote.audio import Audio
@@ -33,8 +34,8 @@ class Predictor(BasePredictor):
 
     def predict(
         self,
-        filestring: str = Input(description="Base64 encoded audio file", default=None),
-        filepath: Path = Input(description="An audio file path", default=None),
+        file_string: str = Input(description="Base64 encoded audio file", default=None),
+        file_url: Path = Input(description="An audio file URL", default=None),
         file: File = Input(description="An audio file", default=None),
         num_speakers: int = Input(
             description="Number of speakers", ge=1, le=25, default=2
@@ -45,27 +46,30 @@ class Predictor(BasePredictor):
     ) -> ModelOutput:
         """Run a single prediction on the model"""
         # Check if either filestring, filepath or file is provided
-        if filestring is None and filepath is None and file is None:
+        if file_string is None and file_url is None and file is None:
             raise RuntimeError("No audio file provided")
 
+        filepath = ''
+        file_start, file_ending = os.path.splitext(f'{filename}')
+        ts = time.time()
+        ts = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d-%H-%M-%S')
+        filename = f'{ts}-{file_start}{file_ending}'
+
         # If filestring is provided, save it to a file
-        if filestring is not None and filepath is None and file is None:
-            base64file = filestring.split(',')[1] if ',' in filestring else filestring
+        if file_string is not None and file_url is None and file is None:
+            base64file = file_string.split(',')[1] if ',' in file_string else file_string
             file_data = base64.b64decode(base64file)
-            file_start, file_ending = os.path.splitext(f'{filename}')
-            ts = time.time()
-            ts = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d-%H-%M-%S')
-            filename = f'{ts}-{file_start}{file_ending}'
             with open(filename, 'wb') as f:
                 f.write(file_data)
-            filepath = filename
 
-        # If file is provided, save it to a file
-        if file is not None and filepath is None:
-            file.save()
-            filepath = file.name
+        # If file_url is provided, download the file from url
+        if file_string is None and file_url is not None and file is None:
+            response = requests.get(file_url)
+            with open(filename, 'wb') as file:
+                file.write(response.content)
 
 
+        filepath = filename
         transcription = self.speech_to_text(filepath, num_speakers, prompt)
         # print for testing
         print(transcription)
