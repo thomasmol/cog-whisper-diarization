@@ -22,6 +22,7 @@ from typing import Any
 class ModelOutput(BaseModel):
     segments: Any
     webook_id: str
+    file_url: str
 
 class Predictor(BasePredictor):
     def setup(self):
@@ -35,7 +36,7 @@ class Predictor(BasePredictor):
     def predict(
         self,
         file_string: str = Input(description="Base64 encoded audio file", default=None),
-        file_url: Path = Input(description="An audio file URL", default=None),
+        file_url: str = Input(description="An audio file URL", default=None),
         file: File = Input(description="An audio file", default=None),
         num_speakers: int = Input(
             description="Number of speakers", ge=1, le=25, default=2
@@ -68,6 +69,8 @@ class Predictor(BasePredictor):
             with open(filename, 'wb') as file:
                 file.write(response.content)
 
+        # so i can send it to webhook and delete it
+        file_url = file_url if file_url is not None else ''
 
         filepath = filename
         transcription = self.speech_to_text(filepath, num_speakers, prompt)
@@ -80,7 +83,8 @@ class Predictor(BasePredictor):
         # Return the results as a JSON object
         return ModelOutput(
             segments=transcription,
-            webook_id=webook_id
+            webook_id=webook_id,
+            file_url=file_url
         )
 
 
