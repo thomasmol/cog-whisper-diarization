@@ -1,5 +1,5 @@
 # Prediction interface for Cog ⚙️
-from cog import BasePredictor, Input, Path, BaseModel
+from cog import BasePredictor, Input, Path, File, BaseModel
 import os
 import time
 import json
@@ -20,6 +20,7 @@ from typing import Any
 
 class ModelOutput(BaseModel):
     segments: Any
+    webook_id: str
 
 class Predictor(BasePredictor):
     def setup(self):
@@ -32,26 +33,39 @@ class Predictor(BasePredictor):
 
     def predict(
         self,
-        file: str = Input(description="Base 64 encoded audio file"),
+        filestring: str = Input(description="Base64 encoded audio file", default=None),
+        filepath: Path = Input(description="An audio file path", default=None),
+        file: File = Input(description="An audio file", default=None),
         num_speakers: int = Input(
             description="Number of speakers", ge=1, le=25, default=2
         ),
-        filename: str = Input(description="Filename", default="audio.wav"),
-        prompt: str = Input(description="Prompt, to be used as context", default="some prompt"),
+        webook_id: str = Input(description="Webhook ID"),
+        filename: str = Input(description="Filename"),
+        prompt: str = Input(description="Prompt, to be used as context", default="some people speaking"),
     ) -> ModelOutput:
         """Run a single prediction on the model"""
-        base64file = file.split(',')[1] if ',' in file else file
-        file_data = base64.b64decode(base64file)
-        file_start, file_ending = os.path.splitext(f'{filename}')
+        # Check if either filestring, filepath or file is provided
+        if filestring is None and filepath is None and file is None:
+            raise RuntimeError("No audio file provided")
 
-        ts = time.time()
-        ts = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d-%H-%M-%S')
-        filename = f'{ts}-{file_start}{file_ending}'
-        with open(filename, 'wb') as f:
-            f.write(file_data)
+        # If filestring is provided, save it to a file
+        if filestring is not None and filepath is None and file is None:
+            base64file = filestring.split(',')[1] if ',' in filestring else filestring
+            file_data = base64.b64decode(base64file)
+            file_start, file_ending = os.path.splitext(f'{filename}')
+            ts = time.time()
+            ts = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d-%H-%M-%S')
+            filename = f'{ts}-{file_start}{file_ending}'
+            with open(filename, 'wb') as f:
+                f.write(file_data)
+            filepath = filename
 
-        # filepath = f'uploads/{filename}'
-        filepath = filename
+        # If file is provided, save it to a file
+        if file is not None and filepath is None:
+            file.save()
+            filepath = file.name
+
+
         transcription = self.speech_to_text(filepath, num_speakers, prompt)
         # print for testing
         print(transcription)
@@ -61,7 +75,8 @@ class Predictor(BasePredictor):
 
         # Return the results as a JSON object
         return ModelOutput(
-            segments=transcription
+            segments=transcription,
+            webook_id=webook_id
         )
 
 
