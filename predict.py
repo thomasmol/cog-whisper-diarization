@@ -23,7 +23,7 @@ class ModelOutput(BaseModel):
     segments: Any
     webhook_id: str
     file_url: str
-    offset_seconds: int
+    chunk_index: int
 
 class Predictor(BasePredictor):
     def setup(self):
@@ -40,6 +40,7 @@ class Predictor(BasePredictor):
         file_url: str = Input(description="An audio file URL", default=None),
         file: File = Input(description="An audio file", default=None),
         offset_seconds: int = Input(description="Offset in seconds, used for chunked inputs", default=0, ge=0),
+        chunk_index: int = Input(description="Index of chunk", default=0, ge=0),
         num_speakers: int = Input(
             description="Number of speakers", ge=1, le=25, default=2
         ),
@@ -89,7 +90,8 @@ class Predictor(BasePredictor):
             segments=transcription,
             webhook_id=webhook_id,
             file_url=file_url,
-            offset_seconds=offset_seconds
+            offset_seconds=offset_seconds,
+            chunk_index=chunk_index,
         )
 
 
