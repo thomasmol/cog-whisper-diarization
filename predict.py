@@ -77,7 +77,9 @@ class Predictor(BasePredictor):
         # print for testing
         print(transcription)
 
-        os.remove(filepath)
+        # if file was not .wav, delete it
+        if file_ending != '.wav':
+            os.remove(filepath)
         print(f'{filepath} removed, done with inference')
 
         # Return the results as a JSON object
