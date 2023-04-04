@@ -23,6 +23,7 @@ class ModelOutput(BaseModel):
     segments: Any
     webhook_id: str
     file_url: str
+    offset_seconds: int
 
 class Predictor(BasePredictor):
     def setup(self):
@@ -87,7 +88,8 @@ class Predictor(BasePredictor):
         return ModelOutput(
             segments=transcription,
             webhook_id=webhook_id,
-            file_url=file_url
+            file_url=file_url,
+            offset_seconds=offset_seconds
         )
 
 
@@ -154,8 +156,8 @@ class Predictor(BasePredictor):
             for segment in segments:
                 # Append the segment to the output list
                 output.append({
-                    'start': str(self.convert_time(segment["start"], offset_seconds)),
-                    'end': str(self.convert_time(segment["end"], offset_seconds)),
+                    'start': str(segment["start"] + offset_seconds),
+                    'end': str(segment["end"] + offset_seconds),
                     'speaker': segment["speaker"],
                     'text': segment["text"]
                 })
