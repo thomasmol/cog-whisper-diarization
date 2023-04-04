@@ -21,7 +21,7 @@ from typing import Any
 
 class ModelOutput(BaseModel):
     segments: Any
-    webook_id: str
+    webhook_id: str
     file_url: str
 
 class Predictor(BasePredictor):
@@ -41,7 +41,7 @@ class Predictor(BasePredictor):
         num_speakers: int = Input(
             description="Number of speakers", ge=1, le=25, default=2
         ),
-        webook_id: str = Input(description="Webhook ID"),
+        webhook_id: str = Input(description="Webhook ID"),
         filename: str = Input(description="Filename"),
         prompt: str = Input(description="Prompt, to be used as context", default="some people speaking"),
     ) -> ModelOutput:
@@ -83,7 +83,7 @@ class Predictor(BasePredictor):
         # Return the results as a JSON object
         return ModelOutput(
             segments=transcription,
-            webook_id=webook_id,
+            webhook_id=webhook_id,
             file_url=file_url
         )
 
