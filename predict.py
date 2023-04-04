@@ -38,7 +38,7 @@ class Predictor(BasePredictor):
         file_string: str = Input(description="Base64 encoded audio file", default=None),
         file_url: str = Input(description="An audio file URL", default=None),
         file: File = Input(description="An audio file", default=None),
-        offset_seconds: int = Input(description="Offset in seconds, used for chunked inputs", default=0),
+        offset_seconds: int = Input(description="Offset in seconds, used for chunked inputs", default=0, ge=0),
         num_speakers: int = Input(
             description="Number of speakers", ge=1, le=25, default=2
         ),
@@ -92,7 +92,7 @@ class Predictor(BasePredictor):
 
 
     def convert_time(self, secs, offset_seconds=0):
-        return datetime.timedelta(seconds=round(secs) + offset_seconds)
+        return datetime.timedelta(seconds=(round(secs) + offset_seconds))
 
 
     def speech_to_text(self, filepath, num_speakers, prompt, offset_seconds=0):
@@ -155,7 +155,7 @@ class Predictor(BasePredictor):
                 # Append the segment to the output list
                 output.append({
                     'start': str(self.convert_time(segment["start"], offset_seconds)),
-                    'end': str(self.convert_time(segment["end"]), offset_seconds),
+                    'end': str(self.convert_time(segment["end"], offset_seconds)),
                     'speaker': segment["speaker"],
                     'text': segment["text"]
                 })
