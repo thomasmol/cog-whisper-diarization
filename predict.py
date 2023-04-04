@@ -24,6 +24,7 @@ class ModelOutput(BaseModel):
     webhook_id: str
     file_url: str
     chunk_index: int
+    chunk_count: int
 
 class Predictor(BasePredictor):
     def setup(self):
@@ -41,6 +42,7 @@ class Predictor(BasePredictor):
         file: File = Input(description="An audio file", default=None),
         offset_seconds: int = Input(description="Offset in seconds, used for chunked inputs", default=0, ge=0),
         chunk_index: int = Input(description="Index of chunk", default=0, ge=0),
+        chunk_count: int = Input(description="Number of chunks", default=1, ge=1),
         num_speakers: int = Input(
             description="Number of speakers", ge=1, le=25, default=2
         ),
@@ -92,6 +94,7 @@ class Predictor(BasePredictor):
             file_url=file_url,
             offset_seconds=offset_seconds,
             chunk_index=chunk_index,
+            chunk_count=chunk_count
         )
 
 
@@ -158,8 +161,8 @@ class Predictor(BasePredictor):
             for segment in segments:
                 # Append the segment to the output list
                 output.append({
-                    'start': str(segment["start"] + offset_seconds),
-                    'end': str(segment["end"] + offset_seconds),
+                    'start': str(round(segment["start"] + offset_seconds)),
+                    'end': str(round(segment["end"] + offset_seconds)),
                     'speaker': segment["speaker"],
                     'text': segment["text"]
                 })
