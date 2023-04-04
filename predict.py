@@ -26,33 +26,48 @@ class ModelOutput(BaseModel):
     chunk_index: int
     chunk_count: int
 
+
 class Predictor(BasePredictor):
+
     def setup(self):
         """Load the model into memory to make running multiple predictions efficient"""
         model_name = "large-v2"
         self.model = whisper.load_model(model_name)
         self.embedding_model = PretrainedSpeakerEmbedding(
-        "speechbrain/spkrec-ecapa-voxceleb",
-            device=torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+            "speechbrain/spkrec-ecapa-voxceleb",
+            device=torch.device(
+                "cuda" if torch.cuda.is_available() else "cpu"))
 
     def predict(
         self,
-        file_string: str = Input(description="Base64 encoded audio file", default=None),
+        file_string: str = Input(description="Base64 encoded audio file",
+                                 default=None),
         file_url: str = Input(description="An audio file URL", default=None),
         file: File = Input(description="An audio file", default=None),
-        offset_seconds: int = Input(description="Offset in seconds, used for chunked inputs", default=0, ge=0),
-        chunk_index: int = Input(description="Index of chunk", default=0, ge=0),
-        chunk_count: int = Input(description="Number of chunks", default=1, ge=1),
-        num_speakers: int = Input(
-            description="Number of speakers", ge=1, le=25, default=2
-        ),
+        offset_seconds: int = Input(
+            description="Offset in seconds, used for chunked inputs",
+            default=0,
+            ge=0),
+        chunk_index: int = Input(description="Index of chunk", default=0,
+                                 ge=0),
+        chunk_count: int = Input(description="Number of chunks",
+                                 default=1,
+                                 ge=1),
+        num_speakers: int = Input(description="Number of speakers",
+                                  ge=1,
+                                  le=25,
+                                  default=2),
         webhook_id: str = Input(description="Webhook ID"),
-        filename: str = Input(description="Filename, only needed if file_string is provided"),
-        prompt: str = Input(description="Prompt, to be used as context", default="some people speaking"),
+        filename: str = Input(
+            description="Filename, only needed if file_string is provided"),
+        prompt: str = Input(description="Prompt, to be used as context",
+                            default="some people speaking"),
     ) -> ModelOutput:
         """Run a single prediction on the model"""
         # Check if either filestring, filepath or file is provided, but only 1 of them
-        if sum([file_string is not None, file_url is not None, file is not None]) != 1:
+        if sum([
+                file_string is not None, file_url is not None, file is not None
+        ]) != 1:
             raise RuntimeError("Provide either file_string, file_url or file")
 
         filepath = ''
@@ -63,7 +78,8 @@ class Predictor(BasePredictor):
 
         # If filestring is provided, save it to a file
         if file_string is not None and file_url is None and file is None:
-            base64file = file_string.split(',')[1] if ',' in file_string else file_string
+            base64file = file_string.split(
+                ',')[1] if ',' in file_string else file_string
             file_data = base64.b64decode(base64file)
             with open(filename, 'wb') as f:
                 f.write(file_data)
@@ -78,7 +94,8 @@ class Predictor(BasePredictor):
         file_url = file_url if file_url is not None else ''
 
         filepath = filename
-        transcription = self.speech_to_text(filepath, num_speakers, prompt, offset_seconds)
+        transcription = self.speech_to_text(filepath, num_speakers, prompt,
+                                            offset_seconds)
         # print for testing
         print(transcription)
 
@@ -88,19 +105,15 @@ class Predictor(BasePredictor):
         print(f'{filepath} removed, done with inference')
 
         # Return the results as a JSON object
-        return ModelOutput(
-            segments=transcription,
-            webhook_id=webhook_id,
-            file_url=file_url,
-            offset_seconds=offset_seconds,
-            chunk_index=chunk_index,
-            chunk_count=chunk_count
-        )
-
+        return ModelOutput(segments=transcription,
+                           webhook_id=webhook_id,
+                           file_url=file_url,
+                           offset_seconds=offset_seconds,
+                           chunk_index=chunk_index,
+                           chunk_count=chunk_count)
 
     def convert_time(self, secs, offset_seconds=0):
         return datetime.timedelta(seconds=(round(secs) + offset_seconds))
-
 
     def speech_to_text(self, filepath, num_speakers, prompt, offset_seconds=0):
         # model = whisper.load_model('large-v2')
@@ -112,7 +125,8 @@ class Predictor(BasePredictor):
             audio_file_wav = filepath.replace(file_ending, ".wav")
             print("-----starting conversion to wav-----")
             os.system(
-                f'ffmpeg -i "{filepath}" -ar 16000 -ac 1 -c:a pcm_s16le "{audio_file_wav}"')
+                f'ffmpeg -i "{filepath}" -ar 16000 -ac 1 -c:a pcm_s16le "{audio_file_wav}"'
+            )
         except Exception as e:
             raise RuntimeError("Error converting audio")
 
@@ -127,8 +141,9 @@ class Predictor(BasePredictor):
         print("starting whisper")
         options = dict(beam_size=5, best_of=5)
         transcribe_options = dict(task="transcribe", **options)
-        result = self.model.transcribe(
-            audio_file_wav, **transcribe_options, initial_prompt=prompt)
+        result = self.model.transcribe(audio_file_wav,
+                                       **transcribe_options,
+                                       initial_prompt=prompt)
         segments = result["segments"]
         print("done with whisper")
 
@@ -158,14 +173,40 @@ class Predictor(BasePredictor):
 
             # Make output
             output = []  # Initialize an empty list for the output
-            for segment in segments:
-                # Append the segment to the output list
-                output.append({
-                    'start': str(round(segment["start"] + offset_seconds)),
-                    'end': str(round(segment["end"] + offset_seconds)),
-                    'speaker': segment["speaker"],
-                    'text': segment["text"]
-                })
+
+            # Initialize the first group with the first segment
+            current_group = {
+                'start': str(round(segments[0]["start"] + offset_seconds)),
+                'end': str(round(segments[0]["end"] + offset_seconds)),
+                'speaker': segments[0]["speaker"],
+                'text': segments[0]["text"]
+            }
+
+            for i in range(1, len(segments)):
+                # Calculate time gap between consecutive segments
+                time_gap = segments[i]["start"] - segments[i - 1]["end"]
+
+                # If the current segment's speaker is the same as the previous segment's speaker, and the time gap is less than or equal to 5 seconds, group them
+                if segments[i]["speaker"] == segments[
+                        i - 1]["speaker"] and time_gap <= 5:
+                    current_group["end"] = str(
+                        round(segments[i]["end"] + offset_seconds))
+                    current_group["text"] += " " + segments[i]["text"]
+                else:
+                    # Add the current_group to the output list
+                    output.append(current_group)
+
+                    # Start a new group with the current segment
+                    current_group = {
+                        'start':
+                        str(round(segments[i]["start"] + offset_seconds)),
+                        'end': str(round(segments[i]["end"] + offset_seconds)),
+                        'speaker': segments[i]["speaker"],
+                        'text': segments[i]["text"]
+                    }
+
+            # Add the last group to the output list
+            output.append(current_group)
 
             print("done with embedding")
             time_end = time.time()
