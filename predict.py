@@ -23,8 +23,10 @@ class ModelOutput(BaseModel):
     segments: Any
     webhook_id: str
     file_url: str
+    offset_seconds: int
     chunk_index: int
     chunk_count: int
+
 
 
 class Predictor(BasePredictor):
@@ -94,14 +96,17 @@ class Predictor(BasePredictor):
         file_url = file_url if file_url is not None else ''
 
         filepath = filename
-        transcription = self.speech_to_text(filepath, num_speakers, prompt,
+        segments = self.speech_to_text(filepath, num_speakers, prompt,
                                             offset_seconds)
-        if file_ending != '.wav':
-            os.remove(filepath)
-        print(f'done with inference')
+        print(f'done with creating segments')
 
+        if file_ending != '.wav':
+            print("removing non wav file")
+            os.remove(filepath)
+
+        print(f'done with inference')
         # Return the results as a JSON object
-        return ModelOutput(segments=transcription,
+        return ModelOutput(segments=segments,
                            webhook_id=webhook_id,
                            file_url=file_url,
                            offset_seconds=offset_seconds,
@@ -117,7 +122,7 @@ class Predictor(BasePredictor):
 
         try:
             _, file_ending = os.path.splitext(f'{filepath}')
-            print(f'file enging is {file_ending}')
+            print(f'file ending in {file_ending}')
             if file_ending != '.wav':
                 audio_file_wav = filepath.replace(file_ending, ".wav")
                 print("-----starting conversion to wav-----")
