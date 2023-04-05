@@ -96,13 +96,9 @@ class Predictor(BasePredictor):
         filepath = filename
         transcription = self.speech_to_text(filepath, num_speakers, prompt,
                                             offset_seconds)
-        # print for testing
-        print(transcription)
-
-        # if file was not .wav, delete it
         if file_ending != '.wav':
             os.remove(filepath)
-        print(f'{filepath} removed, done with inference')
+        print(f'done with inference')
 
         # Return the results as a JSON object
         return ModelOutput(segments=transcription,
@@ -128,6 +124,8 @@ class Predictor(BasePredictor):
                 os.system(
                     f'ffmpeg -i "{filepath}" -ar 16000 -ac 1 -c:a pcm_s16le "{audio_file_wav}"'
                 )
+            else:
+                audio_file_wav = filepath
         except Exception as e:
             raise RuntimeError("Error converting audio")
 
