@@ -122,11 +122,12 @@ class Predictor(BasePredictor):
         try:
             _, file_ending = os.path.splitext(f'{filepath}')
             print(f'file enging is {file_ending}')
-            audio_file_wav = filepath.replace(file_ending, ".wav")
-            print("-----starting conversion to wav-----")
-            os.system(
-                f'ffmpeg -i "{filepath}" -ar 16000 -ac 1 -c:a pcm_s16le "{audio_file_wav}"'
-            )
+            if file_ending != '.wav':
+                audio_file_wav = filepath.replace(file_ending, ".wav")
+                print("-----starting conversion to wav-----")
+                os.system(
+                    f'ffmpeg -i "{filepath}" -ar 16000 -ac 1 -c:a pcm_s16le "{audio_file_wav}"'
+                )
         except Exception as e:
             raise RuntimeError("Error converting audio")
 
