@@ -6,7 +6,7 @@ import json
 import wave
 import torch
 import base64
-import whisper
+from faster_whisper import WhisperModel
 import datetime
 import contextlib
 import requests
@@ -34,7 +34,7 @@ class Predictor(BasePredictor):
     def setup(self):
         """Load the model into memory to make running multiple predictions efficient"""
         model_name = "large-v2"
-        self.model = whisper.load_model(model_name)
+        self.model = WhisperModel(model_name, device="cuda", compute_type="float16")
         self.embedding_model = PretrainedSpeakerEmbedding(
             "speechbrain/spkrec-ecapa-voxceleb",
             device=torch.device(
@@ -145,12 +145,12 @@ class Predictor(BasePredictor):
         print("starting whisper")
         options = dict(beam_size=5, best_of=5)
         transcribe_options = dict(task="transcribe", **options)
-        result = self.model.transcribe(audio_file_wav,
+        segments, _ = self.model.transcribe(audio_file_wav,
                                        **transcribe_options,
                                        initial_prompt=prompt)
-        segments = result["segments"]
+        segments = list(segments)
         print("done with whisper")
-
+        segments = [{'start': int(s.start), 'end': int(s.end), 'text': s.text} for s in segments]
         try:
             # Create embedding
             def segment_embedding(segment):
