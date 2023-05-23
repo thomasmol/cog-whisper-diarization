@@ -42,10 +42,19 @@ class Predictor(BasePredictor):
 
     def predict(
         self,
-        file_string: str = Input(description="Base64 encoded audio file",
+        filename: str = Input(
+            description="Filename with file type extension."),
+        file_string: str = Input(description="Either provide: Base64 encoded audio file,",
                                  default=None),
-        file_url: str = Input(description="An audio file URL", default=None),
-        file: File = Input(description="An audio file", default=None),
+        file_url: str = Input(description="Or provide: A direct audio file URL", default=None),
+        # file: File = Input(description="An audio file", default=None), not implemented yet
+        group_segments: bool = Input(description="Group segments of same speaker shorter apart than 2 seconds", default=True),
+        num_speakers: int = Input(description="Number of speakers",
+                                  ge=1,
+                                  le=25,
+                                  default=2),
+        prompt: str = Input(description="Prompt, to be used as context",
+                            default="Some people speaking."),
         offset_seconds: int = Input(
             description="Offset in seconds, used for chunked inputs",
             default=0,
@@ -55,22 +64,14 @@ class Predictor(BasePredictor):
         chunk_count: int = Input(description="Number of chunks",
                                  default=1,
                                  ge=1),
-        num_speakers: int = Input(description="Number of speakers",
-                                  ge=1,
-                                  le=25,
-                                  default=2),
         webhook_id: str = Input(description="Webhook ID"),
-        filename: str = Input(
-            description="Filename, only needed if file_string is provided"),
-        prompt: str = Input(description="Prompt, to be used as context",
-                            default="some people speaking"),
     ) -> ModelOutput:
         """Run a single prediction on the model"""
         # Check if either filestring, filepath or file is provided, but only 1 of them
         if sum([
-                file_string is not None, file_url is not None, file is not None
+                file_string is not None, file_url is not None
         ]) != 1:
-            raise RuntimeError("Provide either file_string, file_url or file")
+            raise RuntimeError("Provide either file_string or file_url")
 
         filepath = ''
         file_start, file_ending = os.path.splitext(f'{filename}')
@@ -79,7 +80,7 @@ class Predictor(BasePredictor):
         filename = f'{ts}-{file_start}{file_ending}'
 
         # If filestring is provided, save it to a file
-        if file_string is not None and file_url is None and file is None:
+        if file_string is not None and file_url is None:
             base64file = file_string.split(
                 ',')[1] if ',' in file_string else file_string
             file_data = base64.b64decode(base64file)
@@ -87,7 +88,7 @@ class Predictor(BasePredictor):
                 f.write(file_data)
 
         # If file_url is provided, download the file from url
-        if file_string is None and file_url is not None and file is None:
+        if file_string is None and file_url is not None:
             response = requests.get(file_url)
             with open(filename, 'wb') as file:
                 file.write(response.content)
@@ -97,7 +98,7 @@ class Predictor(BasePredictor):
 
         filepath = filename
         segments = self.speech_to_text(filepath, num_speakers, prompt,
-                                            offset_seconds)
+                                            offset_seconds, group_segments)
         print(f'done with creating segments')
 
         if file_ending != '.wav':
@@ -116,7 +117,7 @@ class Predictor(BasePredictor):
     def convert_time(self, secs, offset_seconds=0):
         return datetime.timedelta(seconds=(round(secs) + offset_seconds))
 
-    def speech_to_text(self, filepath, num_speakers, prompt, offset_seconds=0):
+    def speech_to_text(self, filepath, num_speakers=2, prompt="People takling.", offset_seconds=0, group_segments=True):
         # model = whisper.load_model('large-v2')
         time_start = time.time()
 
@@ -190,9 +191,9 @@ class Predictor(BasePredictor):
                 # Calculate time gap between consecutive segments
                 time_gap = segments[i]["start"] - segments[i - 1]["end"]
 
-                # If the current segment's speaker is the same as the previous segment's speaker, and the time gap is less than or equal to 5 seconds, group them
+                # If the current segment's speaker is the same as the previous segment's speaker, and the time gap is less than or equal to 2 seconds, group them
                 if segments[i]["speaker"] == segments[
-                        i - 1]["speaker"] and time_gap <= 5:
+                        i - 1]["speaker"] and time_gap <= 2 and group_segments:
                     current_group["end"] = str(
                         round(segments[i]["end"] + offset_seconds))
                     current_group["text"] += " " + segments[i]["text"]
