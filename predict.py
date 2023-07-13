@@ -21,12 +21,6 @@ from typing import Any
 
 class ModelOutput(BaseModel):
     segments: Any
-    webhook_id: str
-    file_url: str
-    offset_seconds: int
-    chunk_index: int
-    chunk_count: int
-
 
 
 class Predictor(BasePredictor):
@@ -43,7 +37,7 @@ class Predictor(BasePredictor):
     def predict(
         self,
         filename: str = Input(
-            description="Filename with file type extension."),
+            description="Filename with file type extension.", default=None),
         file_string: str = Input(description="Either provide: Base64 encoded audio file,",
                                  default=None),
         file_url: str = Input(description="Or provide: A direct audio file URL", default=None),
@@ -51,20 +45,14 @@ class Predictor(BasePredictor):
         group_segments: bool = Input(description="Group segments of same speaker shorter apart than 2 seconds", default=True),
         num_speakers: int = Input(description="Number of speakers",
                                   ge=1,
-                                  le=25,
+                                  le=50,
                                   default=2),
         prompt: str = Input(description="Prompt, to be used as context",
                             default="Some people speaking."),
         offset_seconds: int = Input(
             description="Offset in seconds, used for chunked inputs",
             default=0,
-            ge=0),
-        chunk_index: int = Input(description="Index of chunk", default=0,
-                                 ge=0),
-        chunk_count: int = Input(description="Number of chunks",
-                                 default=1,
-                                 ge=1),
-        webhook_id: str = Input(description="Webhook ID"),
+            ge=0)
     ) -> ModelOutput:
         """Run a single prediction on the model"""
         # Check if either filestring, filepath or file is provided, but only 1 of them
@@ -107,12 +95,7 @@ class Predictor(BasePredictor):
 
         print(f'done with inference')
         # Return the results as a JSON object
-        return ModelOutput(segments=segments,
-                           webhook_id=webhook_id,
-                           file_url=file_url,
-                           offset_seconds=offset_seconds,
-                           chunk_index=chunk_index,
-                           chunk_count=chunk_count)
+        return ModelOutput(segments=segments)
 
     def convert_time(self, secs, offset_seconds=0):
         return datetime.timedelta(seconds=(round(secs) + offset_seconds))
