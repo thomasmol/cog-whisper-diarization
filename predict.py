@@ -17,6 +17,9 @@ from pyannote.core import Segment
 from sklearn.cluster import AgglomerativeClustering
 from pyannote.audio.pipelines.speaker_verification import PretrainedSpeakerEmbedding
 from typing import Any
+import mimetypes
+import magic
+
 
 
 class ModelOutput(BaseModel):
@@ -36,8 +39,6 @@ class Predictor(BasePredictor):
 
     def predict(
         self,
-        filename: str = Input(
-            description="Filename with file type extension.", default=None),
         file_string: str = Input(description="Either provide: Base64 encoded audio file,",
                                  default=None),
         file_url: str = Input(description="Or provide: A direct audio file URL", default=None),
@@ -61,35 +62,41 @@ class Predictor(BasePredictor):
         ]) != 1:
             raise RuntimeError("Provide either file_string or file_url")
 
-        filepath = ''
-        file_start, file_ending = os.path.splitext(f'{filename}')
+        """ filepath = ''
+        file_start, file_ending = os.path.splitext(f'{filename}')"""
         ts = time.time()
-        ts = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d-%H-%M-%S')
-        filename = f'{ts}-{file_start}{file_ending}'
+        filename = f'{ts}-recording' 
+        file_extension = '.mp3'
 
         # If filestring is provided, save it to a file
         if file_string is not None and file_url is None:
             base64file = file_string.split(
                 ',')[1] if ',' in file_string else file_string
             file_data = base64.b64decode(base64file)
+            mime_type = magic.from_buffer(file_data, mime=True)
+            file_extension = mimetypes.guess_extension(mime_type)
+            filename += file_extension if file_extension else ''
             with open(filename, 'wb') as f:
                 f.write(file_data)
 
         # If file_url is provided, download the file from url
         if file_string is None and file_url is not None:
+            response_head = requests.head(file_url)
+            if 'Content-Type' in response_head.headers:
+                mime_type = response_head.headers['Content-Type']
+                file_extension = mimetypes.guess_extension(mime_type)
             response = requests.get(file_url)
+            filename += file_extension if file_extension else ''
             with open(filename, 'wb') as file:
                 file.write(response.content)
 
-        # so i can send it to webhook and delete it
-        file_url = file_url if file_url is not None else ''
 
         filepath = filename
         segments = self.speech_to_text(filepath, num_speakers, prompt,
                                             offset_seconds, group_segments)
         print(f'done with creating segments')
 
-        if file_ending != '.wav':
+        if file_extension != 'wav':
             print("removing non wav file")
             os.remove(filepath)
 
