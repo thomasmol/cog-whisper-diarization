@@ -36,6 +36,7 @@ build:
      - "psutil==5.9.2"
      - "requests==2.28.2"
      - "pyannote.audio==2.1.1"
+     - "python-magic==0.4.27"
 
   # commands run after the environment is setup
   run:
