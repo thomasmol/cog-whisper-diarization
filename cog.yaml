@@ -9,6 +9,7 @@ build:
   # a list of ubuntu apt packages to install
   system_packages:
     - "ffmpeg"
+    - "libmagic1"
     # - "libgl1-mesa-glx"
     # - "libglib2.0-0"
 
