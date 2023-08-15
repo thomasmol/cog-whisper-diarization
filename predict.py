@@ -30,9 +30,10 @@ class Predictor(BasePredictor):
     def setup(self):
         """Load the model into memory to make running multiple predictions efficient"""
         model_name = "large-v2"
-        self.model = WhisperModel(model_name,
-                                  device="cuda",
-                                  compute_type="float16")
+        self.model = WhisperModel(
+            model_name,
+            device=("cuda" if torch.cuda.is_available() else "cpu"),
+            compute_type="float16")
         self.embedding_model = PretrainedSpeakerEmbedding(
             "speechbrain/spkrec-ecapa-voxceleb",
             device=torch.device(
@@ -141,24 +142,26 @@ class Predictor(BasePredictor):
 
         # Transcribe audio
         print("starting whisper")
-        options = dict(beam_size=5, best_of=5, vad_filter=True)
-        transcribe_options = dict(task="transcribe", **options)
-        segments, _ = self.model.transcribe(audio_file_wav,
-                                            **transcribe_options,
-                                            initial_prompt=prompt)
+        options = dict(vad_filter=True,
+                       initial_prompt=prompt,
+                       word_timestamps=True)
+        segments, _ = self.model.transcribe(audio_file_wav, **options)
         segments = list(segments)
         print("done with whisper")
+        print(segments)
         segments = [{
-            'start': int(round(s.start + offset_seconds)),
-            'end': int(round(s.end + offset_seconds)),
-            'text': s.text,
+            'start':
+            int(round(s.start + offset_seconds)),
+            'end':
+            int(round(s.end + offset_seconds)),
+            'text':
+            s.text,
             'words': [{
                 'start': str(round(w.start + offset_seconds)),
                 'end': str(round(w.end + offset_seconds)),
                 'word': w.word
             } for w in s.words]
         } for s in segments]
-
 
         try:
             # Create embedding
@@ -170,7 +173,7 @@ class Predictor(BasePredictor):
                 clip = Segment(start, end)
                 waveform, sample_rate = audio.crop(audio_file_wav, clip)
                 return self.embedding_model(waveform[None])
-            
+
             if num_speakers < 2:
                 for segment in segments:
                     segment['speaker'] = 'Speaker 1'
@@ -183,7 +186,8 @@ class Predictor(BasePredictor):
                 print(f'Embedding shape: {embeddings.shape}')
 
                 # Assign speaker label
-                clustering = AgglomerativeClustering(num_speakers).fit(embeddings)
+                clustering = AgglomerativeClustering(num_speakers).fit(
+                    embeddings)
                 labels = clustering.labels_
                 for i in range(len(segments)):
                     segments[i]["speaker"] = 'Speaker ' + str(labels[i] + 1)
@@ -216,8 +220,7 @@ class Predictor(BasePredictor):
 
                     # Start a new group with the current segment
                     current_group = {
-                        'start':
-                        str(segments[i]["start"]),
+                        'start': str(segments[i]["start"]),
                         'end': str(segments[i]["end"]),
                         'speaker': segments[i]["speaker"],
                         'text': segments[i]["text"],
