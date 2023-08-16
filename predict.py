@@ -32,7 +32,7 @@ class Predictor(BasePredictor):
         model_name = "large-v2"
         self.model = WhisperModel(
             model_name,
-            device=("cuda" if torch.cuda.is_available() else "cpu"),
+            device="cuda" if torch.cuda.is_available() else "cpu",
             compute_type="float16")
         self.embedding_model = PretrainedSpeakerEmbedding(
             "speechbrain/spkrec-ecapa-voxceleb",
@@ -68,7 +68,7 @@ class Predictor(BasePredictor):
             raise RuntimeError("Provide either file_string or file_url")
         """ filepath = ''
         file_start, file_ending = os.path.splitext(f'{filename}')"""
-        ts = time.time()
+        ts = time.time_ns()
         filename = f'{ts}-recording'
         file_extension = '.mp3'
 
@@ -148,7 +148,6 @@ class Predictor(BasePredictor):
         segments, _ = self.model.transcribe(audio_file_wav, **options)
         segments = list(segments)
         print("done with whisper")
-        print(segments)
         segments = [{
             'start':
             int(round(s.start + offset_seconds)),
