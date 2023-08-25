@@ -21,8 +21,8 @@ import mimetypes
 import magic
 
 
-class ModelOutput(BaseModel):
-    segments: Any
+class Output(BaseModel):
+    segments: list
 
 
 class Predictor(BasePredictor):
@@ -61,7 +61,7 @@ class Predictor(BasePredictor):
             description="Offset in seconds, used for chunked inputs",
             default=0,
             ge=0)
-    ) -> ModelOutput:
+    ) -> Output:
         """Run a single prediction on the model"""
         # Check if either filestring, filepath or file is provided, but only 1 of them
         if sum([file_string is not None, file_url is not None]) != 1:
@@ -105,7 +105,7 @@ class Predictor(BasePredictor):
 
         print(f'done with inference')
         # Return the results as a JSON object
-        return ModelOutput(segments=segments)
+        return Output(segments=segments)
 
     def convert_time(self, secs, offset_seconds=0):
         return datetime.timedelta(seconds=(round(secs) + offset_seconds))
