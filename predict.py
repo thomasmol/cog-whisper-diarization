@@ -7,13 +7,14 @@ import json
 import magic
 import mimetypes
 import numpy as np
+import subprocess
+import io
 import os
 import pandas as pd
 import requests
 import time
 import torch
 import wave
-import tempfile
 
 from cog import BasePredictor, BaseModel, Input, File
 from faster_whisper import WhisperModel
@@ -68,74 +69,70 @@ class Predictor(BasePredictor):
         # Check if either filestring, filepath or file is provided, but only 1 of them
         if sum([file_string is not None, file_url is not None]) != 1:
             raise RuntimeError("Provide either file_string or file_url")
+        
+        try:
+            # Generate a temporary filename
+            temp_wav_filename = f"temp-{time.time_ns()}.wav"
 
-        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as temp_file:
-            filename = temp_file.name  # This will be a unique filename with a .mp3 extension
-            file_extension = ".mp3"
+            if file_string is not None:
+                audio_data = base64.b64decode(file_string.split(',')[1] if ',' in file_string else file_string)
+                temp_audio_filename = f"temp-{time.time_ns()}.audio"
+                with open(temp_audio_filename, 'wb') as f:
+                    f.write(audio_data)
 
-            try:
-                # If filestring is provided, save it to a file
-                if file_string is not None and file_url is None:
-                    base64file = file_string.split(
-                        ',')[1] if ',' in file_string else file_string
-                    file_data = base64.b64decode(base64file)
-                    mime_type = magic.from_buffer(file_data, mime=True)
-                    file_extension = mimetypes.guess_extension(mime_type)
-                    filename += file_extension
-                    temp_file.write(file_data)
+                subprocess.run([
+                    'ffmpeg',
+                    '-i', temp_audio_filename,
+                    '-ar', '16000',
+                    '-ac', '1',
+                    '-c:a', 'pcm_s16le',
+                    temp_wav_filename
+                ])
 
-                # If file_url is provided, download the file from url
-                if file_string is None and file_url is not None:
-                    response_head = requests.head(file_url)
-                    if 'Content-Type' in response_head.headers:
-                        mime_type = response_head.headers['Content-Type']
-                        file_extension = mimetypes.guess_extension(mime_type)
-                    response = requests.get(file_url)
-                    filename += file_extension
-                    temp_file.write(response.content)
+                if os.path.exists(temp_audio_filename):
+                    os.remove(temp_audio_filename)
 
-                filepath = filename
-                segments = self.speech_to_text(filepath, num_speakers, prompt,
-                                            offset_seconds, group_segments)
-                print(f'done with creating segments')
+            elif file_url is not None:
+                response = requests.get(file_url)
+                temp_audio_filename = f"temp-{time.time_ns()}.audio"
+                with open(temp_audio_filename, 'wb') as file:
+                    file.write(response.content)
 
-                if file_extension != 'wav':
-                    print("removing non wav file")
-                    os.remove(filepath)
+                subprocess.run([
+                    'ffmpeg',
+                    '-i', temp_audio_filename,
+                    '-ar', '16000',
+                    '-ac', '1',
+                    '-c:a', 'pcm_s16le',
+                    temp_wav_filename
+                ])
 
-                print(f'done with inference')
-                # Return the results as a JSON object
-                return Output(segments=segments)
-            finally:
-                # Remove the temporary file
-                if os.path.exists(filename):
-                    os.remove(filename)
+                if os.path.exists(temp_audio_filename):
+                    os.remove(temp_audio_filename)
+            
+            segments = self.speech_to_text(temp_wav_filename, num_speakers, prompt,
+                                        offset_seconds, group_segments)
+
+            print(f'done with inference')
+            # Return the results as a JSON object
+            return Output(segments=segments)
+            
+        finally:
+            # Clean up
+            if os.path.exists(temp_wav_filename):
+                os.remove(temp_wav_filename)
+
 
     def convert_time(self, secs, offset_seconds=0):
         return datetime.timedelta(seconds=(round(secs) + offset_seconds))
 
     def speech_to_text(self,
-                       filepath,
+                       audio_file_wav,
                        num_speakers=2,
                        prompt="People takling.",
                        offset_seconds=0,
                        group_segments=True):
-        # model = whisper.load_model('large-v2')
         time_start = time.time()
-
-        try:
-            _, file_ending = os.path.splitext(f'{filepath}')
-            print(f'file ending in {file_ending}')
-            if file_ending != '.wav':
-                audio_file_wav = filepath.replace(file_ending, ".wav")
-                print("-----starting conversion to wav-----")
-                os.system(
-                    f'ffmpeg -i "{filepath}" -ar 16000 -ac 1 -c:a pcm_s16le "{audio_file_wav}"'
-                )
-            else:
-                audio_file_wav = filepath
-        except Exception as e:
-            raise RuntimeError("Error converting audio")
 
         # Get duration
         with contextlib.closing(wave.open(audio_file_wav, 'r')) as f:
@@ -236,6 +233,7 @@ class Predictor(BasePredictor):
             print("done with embedding")
             time_end = time.time()
             time_diff = time_end - time_start
+
             system_info = f"""-----Processing time: {time_diff:.5} seconds-----"""
             print(system_info)
             return output
