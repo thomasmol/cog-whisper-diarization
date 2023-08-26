@@ -116,6 +116,9 @@ class Predictor(BasePredictor):
             print(f'done with inference')
             # Return the results as a JSON object
             return Output(segments=segments)
+        
+        except Exception as e:
+            raise RuntimeError("Error Running inference with local model", e)
             
         finally:
             # Clean up
@@ -139,7 +142,6 @@ class Predictor(BasePredictor):
             frames = f.getnframes()
             rate = f.getframerate()
             duration = frames / float(rate)
-        print(f"conversion to wav ready, duration of audio file: {duration}")
 
         # Transcribe audio
         print("starting whisper")
@@ -163,80 +165,76 @@ class Predictor(BasePredictor):
             } for w in s.words]
         } for s in segments]
 
-        try:
-            # Create embedding
-            def segment_embedding(segment):
-                audio = Audio()
-                start = segment["start"]
-                # Whisper overshoots the end timestamp in the last segment
-                end = min(duration, segment["end"])
-                clip = Segment(start, end)
-                waveform, sample_rate = audio.crop(audio_file_wav, clip)
-                return self.embedding_model(waveform[None])
+        # Create embedding
+        def segment_embedding(segment):
+            audio = Audio()
+            start = segment["start"]
+            # Whisper overshoots the end timestamp in the last segment
+            end = min(duration, segment["end"])
+            clip = Segment(start, end)
+            waveform, sample_rate = audio.crop(audio_file_wav, clip)
+            return self.embedding_model(waveform[None])
 
-            if num_speakers < 2:
-                for segment in segments:
-                    segment['speaker'] = 'Speaker 1'
+        if num_speakers < 2:
+            for segment in segments:
+                segment['speaker'] = 'Speaker 1'
+        else:
+            print("starting embedding")
+            embeddings = np.zeros(shape=(len(segments), 192))
+            for i, segment in enumerate(segments):
+                embeddings[i] = segment_embedding(segment)
+            embeddings = np.nan_to_num(embeddings)
+            print(f'Embedding shape: {embeddings.shape}')
+
+            # Assign speaker label
+            clustering = AgglomerativeClustering(num_speakers).fit(
+                embeddings)
+            labels = clustering.labels_
+            for i in range(len(segments)):
+                segments[i]["speaker"] = 'Speaker ' + str(labels[i] + 1)
+
+        # Make output
+        output = []  # Initialize an empty list for the output
+
+        # Initialize the first group with the first segment
+        current_group = {
+            'start': str(segments[0]["start"]),
+            'end': str(segments[0]["end"]),
+            'speaker': segments[0]["speaker"],
+            'text': segments[0]["text"],
+            'words': segments[0]["words"]
+        }
+
+        for i in range(1, len(segments)):
+            # Calculate time gap between consecutive segments
+            time_gap = segments[i]["start"] - segments[i - 1]["end"]
+
+            # If the current segment's speaker is the same as the previous segment's speaker, and the time gap is less than or equal to 2 seconds, group them
+            if segments[i]["speaker"] == segments[
+                    i - 1]["speaker"] and time_gap <= 2 and group_segments:
+                current_group["end"] = str(segments[i]["end"])
+                current_group["text"] += " " + segments[i]["text"]
+                current_group["words"] += segments[i]["words"]
             else:
-                print("starting embedding")
-                embeddings = np.zeros(shape=(len(segments), 192))
-                for i, segment in enumerate(segments):
-                    embeddings[i] = segment_embedding(segment)
-                embeddings = np.nan_to_num(embeddings)
-                print(f'Embedding shape: {embeddings.shape}')
+                # Add the current_group to the output list
+                output.append(current_group)
 
-                # Assign speaker label
-                clustering = AgglomerativeClustering(num_speakers).fit(
-                    embeddings)
-                labels = clustering.labels_
-                for i in range(len(segments)):
-                    segments[i]["speaker"] = 'Speaker ' + str(labels[i] + 1)
+                # Start a new group with the current segment
+                current_group = {
+                    'start': str(segments[i]["start"]),
+                    'end': str(segments[i]["end"]),
+                    'speaker': segments[i]["speaker"],
+                    'text': segments[i]["text"],
+                    'words': segments[i]["words"]
+                }
 
-            # Make output
-            output = []  # Initialize an empty list for the output
+        # Add the last group to the output list
+        output.append(current_group)
 
-            # Initialize the first group with the first segment
-            current_group = {
-                'start': str(segments[0]["start"]),
-                'end': str(segments[0]["end"]),
-                'speaker': segments[0]["speaker"],
-                'text': segments[0]["text"],
-                'words': segments[0]["words"]
-            }
+        print("done with embedding")
+        time_end = time.time()
+        time_diff = time_end - time_start
 
-            for i in range(1, len(segments)):
-                # Calculate time gap between consecutive segments
-                time_gap = segments[i]["start"] - segments[i - 1]["end"]
-
-                # If the current segment's speaker is the same as the previous segment's speaker, and the time gap is less than or equal to 2 seconds, group them
-                if segments[i]["speaker"] == segments[
-                        i - 1]["speaker"] and time_gap <= 2 and group_segments:
-                    current_group["end"] = str(segments[i]["end"])
-                    current_group["text"] += " " + segments[i]["text"]
-                    current_group["words"] += segments[i]["words"]
-                else:
-                    # Add the current_group to the output list
-                    output.append(current_group)
-
-                    # Start a new group with the current segment
-                    current_group = {
-                        'start': str(segments[i]["start"]),
-                        'end': str(segments[i]["end"]),
-                        'speaker': segments[i]["speaker"],
-                        'text': segments[i]["text"],
-                        'words': segments[i]["words"]
-                    }
-
-            # Add the last group to the output list
-            output.append(current_group)
-
-            print("done with embedding")
-            time_end = time.time()
-            time_diff = time_end - time_start
-
-            system_info = f"""-----Processing time: {time_diff:.5} seconds-----"""
-            print(system_info)
-            return output
-
-        except Exception as e:
-            raise RuntimeError("Error Running inference with local model", e)
+        system_info = f"""-----Processing time: {time_diff:.5} seconds-----"""
+        print(system_info)
+        return output
