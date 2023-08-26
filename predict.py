@@ -1,24 +1,26 @@
 # Prediction interface for Cog ⚙️
-from cog import BasePredictor, Input, File, BaseModel
-import os
-import time
-import json
-import wave
-import torch
+from typing import Any, List
 import base64
-from faster_whisper import WhisperModel
-import datetime
 import contextlib
-import requests
+import datetime
+import json
+import magic
+import mimetypes
 import numpy as np
+import os
 import pandas as pd
+import requests
+import time
+import torch
+import wave
+import tempfile
+
+from cog import BasePredictor, BaseModel, Input, File
+from faster_whisper import WhisperModel
 from pyannote.audio import Audio
+from pyannote.audio.pipelines.speaker_verification import PretrainedSpeakerEmbedding
 from pyannote.core import Segment
 from sklearn.cluster import AgglomerativeClustering
-from pyannote.audio.pipelines.speaker_verification import PretrainedSpeakerEmbedding
-from typing import Any
-import mimetypes
-import magic
 
 
 class Output(BaseModel):
@@ -66,46 +68,48 @@ class Predictor(BasePredictor):
         # Check if either filestring, filepath or file is provided, but only 1 of them
         if sum([file_string is not None, file_url is not None]) != 1:
             raise RuntimeError("Provide either file_string or file_url")
-        """ filepath = ''
-        file_start, file_ending = os.path.splitext(f'{filename}')"""
-        ts = time.time_ns()
-        filename = f'{ts}-recording'
-        file_extension = '.mp3'
 
-        # If filestring is provided, save it to a file
-        if file_string is not None and file_url is None:
-            base64file = file_string.split(
-                ',')[1] if ',' in file_string else file_string
-            file_data = base64.b64decode(base64file)
-            mime_type = magic.from_buffer(file_data, mime=True)
-            file_extension = mimetypes.guess_extension(mime_type)
-            filename += file_extension if file_extension else ''
-            with open(filename, 'wb') as f:
-                f.write(file_data)
+        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as temp_file:
+            filename = temp_file.name  # This will be a unique filename with a .mp3 extension
+            file_extension = ".mp3"
 
-        # If file_url is provided, download the file from url
-        if file_string is None and file_url is not None:
-            response_head = requests.head(file_url)
-            if 'Content-Type' in response_head.headers:
-                mime_type = response_head.headers['Content-Type']
-                file_extension = mimetypes.guess_extension(mime_type)
-            response = requests.get(file_url)
-            filename += file_extension if file_extension else ''
-            with open(filename, 'wb') as file:
-                file.write(response.content)
+            try:
+                # If filestring is provided, save it to a file
+                if file_string is not None and file_url is None:
+                    base64file = file_string.split(
+                        ',')[1] if ',' in file_string else file_string
+                    file_data = base64.b64decode(base64file)
+                    mime_type = magic.from_buffer(file_data, mime=True)
+                    file_extension = mimetypes.guess_extension(mime_type)
+                    filename += file_extension
+                    temp_file.write(file_data)
 
-        filepath = filename
-        segments = self.speech_to_text(filepath, num_speakers, prompt,
-                                       offset_seconds, group_segments)
-        print(f'done with creating segments')
+                # If file_url is provided, download the file from url
+                if file_string is None and file_url is not None:
+                    response_head = requests.head(file_url)
+                    if 'Content-Type' in response_head.headers:
+                        mime_type = response_head.headers['Content-Type']
+                        file_extension = mimetypes.guess_extension(mime_type)
+                    response = requests.get(file_url)
+                    filename += file_extension
+                    temp_file.write(response.content)
 
-        if file_extension != 'wav':
-            print("removing non wav file")
-            os.remove(filepath)
+                filepath = filename
+                segments = self.speech_to_text(filepath, num_speakers, prompt,
+                                            offset_seconds, group_segments)
+                print(f'done with creating segments')
 
-        print(f'done with inference')
-        # Return the results as a JSON object
-        return Output(segments=segments)
+                if file_extension != 'wav':
+                    print("removing non wav file")
+                    os.remove(filepath)
+
+                print(f'done with inference')
+                # Return the results as a JSON object
+                return Output(segments=segments)
+            finally:
+                # Remove the temporary file
+                if os.path.exists(filename):
+                    os.remove(filename)
 
     def convert_time(self, secs, offset_seconds=0):
         return datetime.timedelta(seconds=(round(secs) + offset_seconds))
@@ -232,12 +236,9 @@ class Predictor(BasePredictor):
             print("done with embedding")
             time_end = time.time()
             time_diff = time_end - time_start
-
             system_info = f"""-----Processing time: {time_diff:.5} seconds-----"""
             print(system_info)
-            os.remove(audio_file_wav)
             return output
 
         except Exception as e:
-            os.remove(audio_file_wav)
             raise RuntimeError("Error Running inference with local model", e)
