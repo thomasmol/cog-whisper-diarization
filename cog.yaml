@@ -4,7 +4,6 @@
 build:
   # set to true if your model requires a GPU
   gpu: true
-  cuda: "11.6"
 
   # a list of ubuntu apt packages to install
   system_packages:
@@ -18,14 +17,14 @@ build:
 
   # a list of packages in the format <package-name>==<version>
   python_packages:
-     - "faster-whisper==0.7.1"
+     - "git+https://github.com/thomasmol/faster-whisper.git@master"
      - "transformers==4.25.1"
      - "accelerate==0.15.0"
      - "ffmpeg-python==0.2.0"
      - "pandas==1.5.0"
-     - "torch==1.13.0"
-     - "torchtext==0.14.0"
-     - "torchvision==0.14.0"
+     - "torch==2.0.1"
+     - "torchtext==0.15.2"
+     - "torchvision==0.15.2"
      - "sacremoses==0.0.53"
      - "sentencepiece==0.1.97"
      - "tokenizers==0.13.2"
@@ -36,8 +35,11 @@ build:
      - "pysrt==1.1.2"
      - "psutil==5.9.2"
      - "requests==2.28.2"
-     - "pyannote.audio==2.1.1"
+     - "pyannote.audio==3.0.1"
      - "python-magic==0.4.27"
+     - "tensorboard==2.14.0"
+     - "onnxruntime-gpu==1.16.0"
+
 
   # commands run after the environment is setup
   run:

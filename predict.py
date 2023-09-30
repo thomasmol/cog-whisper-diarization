@@ -16,12 +16,10 @@ import time
 import torch
 import wave
 
-from cog import BasePredictor, BaseModel, Input, File
+from cog import BasePredictor, BaseModel, Input, File, Path
 from faster_whisper import WhisperModel
-from pyannote.audio import Audio
-from pyannote.audio.pipelines.speaker_verification import PretrainedSpeakerEmbedding
-from pyannote.core import Segment
-from sklearn.cluster import AgglomerativeClustering
+from pyannote.audio import Pipeline
+
 
 
 class Output(BaseModel):
@@ -37,10 +35,10 @@ class Predictor(BasePredictor):
             model_name,
             device="cuda" if torch.cuda.is_available() else "cpu",
             compute_type="float16")
-        self.embedding_model = PretrainedSpeakerEmbedding(
-            "speechbrain/spkrec-ecapa-voxceleb",
-            device=torch.device(
-                "cuda" if torch.cuda.is_available() else "cpu"))
+        self.diarization_model = Pipeline.from_pretrained(
+            "pyannote/speaker-diarization-3.0",
+            use_auth_token="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").to(
+                torch.device("cuda"))
 
     def predict(
         self,
@@ -49,7 +47,7 @@ class Predictor(BasePredictor):
             default=None),
         file_url: str = Input(
             description="Or provide: A direct audio file URL", default=None),
-        # file: File = Input(description="An audio file", default=None), not implemented yet
+        file: Path = Input(description="Or an audio file", default=None), 
         group_segments: bool = Input(
             description=
             "Group segments of same speaker shorter apart than 2 seconds",
@@ -67,30 +65,18 @@ class Predictor(BasePredictor):
     ) -> Output:
         """Run a single prediction on the model"""
         # Check if either filestring, filepath or file is provided, but only 1 of them
-        if sum([file_string is not None, file_url is not None]) != 1:
-            raise RuntimeError("Provide either file_string or file_url")
-        
+        """ if sum([file_string is not None, file_url is not None, file is not None]) != 1:
+            raise RuntimeError("Provide either file_string, file or file_url") """
+
         try:
             # Generate a temporary filename
             temp_wav_filename = f"temp-{time.time_ns()}.wav"
 
-            if file_string is not None:
-                audio_data = base64.b64decode(file_string.split(',')[1] if ',' in file_string else file_string)
-                temp_audio_filename = f"temp-{time.time_ns()}.audio"
-                with open(temp_audio_filename, 'wb') as f:
-                    f.write(audio_data)
-
+            if file is not None:
                 subprocess.run([
-                    'ffmpeg',
-                    '-i', temp_audio_filename,
-                    '-ar', '16000',
-                    '-ac', '1',
-                    '-c:a', 'pcm_s16le',
-                    temp_wav_filename
+                    'ffmpeg', '-i', file, '-ar', '16000', '-ac',
+                    '1', '-c:a', 'pcm_s16le', temp_wav_filename
                 ])
-
-                if os.path.exists(temp_audio_filename):
-                    os.remove(temp_audio_filename)
 
             elif file_url is not None:
                 response = requests.get(file_url)
@@ -99,32 +85,45 @@ class Predictor(BasePredictor):
                     file.write(response.content)
 
                 subprocess.run([
-                    'ffmpeg',
-                    '-i', temp_audio_filename,
-                    '-ar', '16000',
-                    '-ac', '1',
-                    '-c:a', 'pcm_s16le',
-                    temp_wav_filename
+                    'ffmpeg', '-i', temp_audio_filename, '-ar', '16000', '-ac',
+                    '1', '-c:a', 'pcm_s16le', temp_wav_filename
                 ])
 
                 if os.path.exists(temp_audio_filename):
                     os.remove(temp_audio_filename)
+            elif file_string is not None:
+                audio_data = base64.b64decode(
+                    file_string.split(',')[1] if ',' in
+                    file_string else file_string)
+                temp_audio_filename = f"temp-{time.time_ns()}.audio"
+                with open(temp_audio_filename, 'wb') as f:
+                    f.write(audio_data)
+
+                subprocess.run([
+                    'ffmpeg', '-i', temp_audio_filename, '-ar', '16000', '-ac',
+                    '1', '-c:a', 'pcm_s16le', temp_wav_filename
+                ])
+
+                if os.path.exists(temp_audio_filename):
+                    os.remove(temp_audio_filename)
+
             
-            segments = self.speech_to_text(temp_wav_filename, num_speakers, prompt,
-                                        offset_seconds, group_segments)
+
+            segments = self.speech_to_text(temp_wav_filename, num_speakers,
+                                           prompt, offset_seconds,
+                                           group_segments)
 
             print(f'done with inference')
             # Return the results as a JSON object
             return Output(segments=segments)
-        
+
         except Exception as e:
             raise RuntimeError("Error Running inference with local model", e)
-            
+
         finally:
             # Clean up
             if os.path.exists(temp_wav_filename):
                 os.remove(temp_wav_filename)
-
 
     def convert_time(self, secs, offset_seconds=0):
         return datetime.timedelta(seconds=(round(secs) + offset_seconds))
@@ -137,62 +136,93 @@ class Predictor(BasePredictor):
                        group_segments=True):
         time_start = time.time()
 
-        # Get duration
-        with contextlib.closing(wave.open(audio_file_wav, 'r')) as f:
-            frames = f.getnframes()
-            rate = f.getframerate()
-            duration = frames / float(rate)
-
         # Transcribe audio
-        print("starting whisper")
+        print("Starting transcribing")
         options = dict(vad_filter=True,
                        initial_prompt=prompt,
                        word_timestamps=True)
         segments, _ = self.model.transcribe(audio_file_wav, **options)
         segments = list(segments)
-        print("done with whisper")
         segments = [{
             'start':
-            int(round(s.start + offset_seconds)),
+            float(s.start + offset_seconds),
             'end':
-            int(round(s.end + offset_seconds)),
+            float(s.end + offset_seconds),
             'text':
             s.text,
             'words': [{
-                'start': str(round(w.start + offset_seconds)),
-                'end': str(round(w.end + offset_seconds)),
+                'start': float(w.start + offset_seconds),
+                'end': float(w.end + offset_seconds),
                 'word': w.word
             } for w in s.words]
         } for s in segments]
 
-        # Create embedding
-        def segment_embedding(segment):
-            audio = Audio()
-            start = segment["start"]
-            # Whisper overshoots the end timestamp in the last segment
-            end = min(duration, segment["end"])
-            clip = Segment(start, end)
-            waveform, sample_rate = audio.crop(audio_file_wav, clip)
-            return self.embedding_model(waveform[None])
+        time_transcribing_end = time.time()
+        print(
+            f"Finished with transcribing, took {time_transcribing_end - time_start:.5} seconds"
+        )
+        diarization = self.diarization_model(audio_file_wav,
+                                             num_speakers=num_speakers)
 
-        if num_speakers < 2:
-            for segment in segments:
-                segment['speaker'] = 'Speaker 1'
-        else:
-            print("starting embedding")
-            embeddings = np.zeros(shape=(len(segments), 192))
-            for i, segment in enumerate(segments):
-                embeddings[i] = segment_embedding(segment)
-            embeddings = np.nan_to_num(embeddings)
-            print(f'Embedding shape: {embeddings.shape}')
+        time_diraization_end = time.time()
+        print(
+            f"Finished with diarization, took {time_diraization_end - time_transcribing_end:.5} seconds"
+        )
 
-            # Assign speaker label
-            clustering = AgglomerativeClustering(num_speakers).fit(
-                embeddings)
-            labels = clustering.labels_
-            for i in range(len(segments)):
-                segments[i]["speaker"] = 'Speaker ' + str(labels[i] + 1)
+        # Initialize variables to keep track of the current position in both lists
+        margin = 0.1  # 0.1 seconds margin
 
+        # Initialize an empty list to hold the final segments with speaker info
+        final_segments = []
+
+        diarization_list = list(diarization.itertracks(yield_label=True))
+        speaker_idx = 0
+        n_speakers = len(diarization_list)
+
+        # Iterate over each segment
+        for segment in segments:
+            segment_start = segment['start'] + offset_seconds
+            segment_end = segment['end'] + offset_seconds
+            segment_text = []
+            segment_words = []
+
+            # Iterate over each word in the segment
+            for word in segment['words']:
+                word['word'] = word['word'].strip()
+                word_start = word['start'] + offset_seconds - margin
+                word_end = word['end'] + offset_seconds + margin
+
+                while speaker_idx < n_speakers:
+                    turn, _, speaker = diarization_list[speaker_idx]
+
+                    if turn.start <= word_end and turn.end >= word_start:
+                        segment_text.append(word['word'].strip(
+                        ))  # Strip the spaces before appending
+                        segment_words.append(word)
+
+                        if turn.end <= word_end:
+                            speaker_idx += 1
+
+                        break
+                    elif turn.end < word_start:
+                        speaker_idx += 1
+                    else:
+                        break
+
+            if segment_text:
+                new_segment = {
+                    'start': segment_start - offset_seconds,
+                    'end': segment_end - offset_seconds,
+                    'speaker': speaker,
+                    'text': ' '.join(segment_text).strip(),
+                    'words': segment_words
+                }
+                final_segments.append(new_segment)
+        time_merging_end = time.time()
+        print(
+            f"Finished with merging, took {time_merging_end - time_diraization_end:.5} seconds"
+        )
+        segments = final_segments
         # Make output
         output = []  # Initialize an empty list for the output
 
@@ -231,10 +261,13 @@ class Predictor(BasePredictor):
         # Add the last group to the output list
         output.append(current_group)
 
-        print("done with embedding")
+        time_cleaning_end = time.time()
+        print(
+            f"Finished with cleaning, took {time_cleaning_end - time_merging_end:.5} seconds"
+        )
         time_end = time.time()
         time_diff = time_end - time_start
 
-        system_info = f"""-----Processing time: {time_diff:.5} seconds-----"""
+        system_info = f"""Processing time: {time_diff:.5} seconds"""
         print(system_info)
         return output
