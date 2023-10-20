@@ -15,11 +15,11 @@ import requests
 import time
 import torch
 import wave
+import re
 
 from cog import BasePredictor, BaseModel, Input, File, Path
 from faster_whisper import WhisperModel
 from pyannote.audio import Pipeline
-
 
 
 class Output(BaseModel):
@@ -47,7 +47,7 @@ class Predictor(BasePredictor):
             default=None),
         file_url: str = Input(
             description="Or provide: A direct audio file URL", default=None),
-        file: Path = Input(description="Or an audio file", default=None), 
+        file: Path = Input(description="Or an audio file", default=None),
         group_segments: bool = Input(
             description=
             "Group segments of same speaker shorter apart than 2 seconds",
@@ -74,8 +74,8 @@ class Predictor(BasePredictor):
 
             if file is not None:
                 subprocess.run([
-                    'ffmpeg', '-i', file, '-ar', '16000', '-ac',
-                    '1', '-c:a', 'pcm_s16le', temp_wav_filename
+                    'ffmpeg', '-i', file, '-ar', '16000', '-ac', '1', '-c:a',
+                    'pcm_s16le', temp_wav_filename
                 ])
 
             elif file_url is not None:
@@ -106,8 +106,6 @@ class Predictor(BasePredictor):
 
                 if os.path.exists(temp_audio_filename):
                     os.remove(temp_audio_filename)
-
-            
 
             segments = self.speech_to_text(temp_wav_filename, num_speakers,
                                            prompt, offset_seconds,
@@ -188,7 +186,6 @@ class Predictor(BasePredictor):
 
             # Iterate over each word in the segment
             for word in segment['words']:
-                word['word'] = word['word'].strip()
                 word_start = word['start'] + offset_seconds - margin
                 word_end = word['end'] + offset_seconds + margin
 
@@ -196,8 +193,11 @@ class Predictor(BasePredictor):
                     turn, _, speaker = diarization_list[speaker_idx]
 
                     if turn.start <= word_end and turn.end >= word_start:
-                        segment_text.append(word['word'].strip(
-                        ))  # Strip the spaces before appending
+                        # Add word without modifications
+                        segment_text.append(word['word'])
+                        
+                        # Strip here for individual word storage
+                        word['word'] = word['word'].strip()
                         segment_words.append(word)
 
                         if turn.end <= word_end:
@@ -210,14 +210,17 @@ class Predictor(BasePredictor):
                         break
 
             if segment_text:
+                combined_text = ''.join(segment_text)
+                cleaned_text = re.sub('  ', ' ', combined_text).strip()
                 new_segment = {
                     'start': segment_start - offset_seconds,
                     'end': segment_end - offset_seconds,
                     'speaker': speaker,
-                    'text': ' '.join(segment_text).strip(),
+                    'text': cleaned_text,
                     'words': segment_words
                 }
                 final_segments.append(new_segment)
+
         time_merging_end = time.time()
         print(
             f"Finished with merging, took {time_merging_end - time_diraization_end:.5} seconds"
