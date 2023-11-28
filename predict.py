@@ -1,20 +1,12 @@
 # Prediction interface for Cog ⚙️
 from typing import Any, List
 import base64
-import contextlib
 import datetime
-import json
-import magic
-import mimetypes
-import numpy as np
 import subprocess
-import io
 import os
-import pandas as pd
 import requests
 import time
 import torch
-import wave
 import re
 
 from cog import BasePredictor, BaseModel, Input, File, Path
@@ -30,13 +22,13 @@ class Predictor(BasePredictor):
 
     def setup(self):
         """Load the model into memory to make running multiple predictions efficient"""
-        model_name = "large-v2"
+        model_name = "large-v3"
         self.model = WhisperModel(
             model_name,
             device="cuda" if torch.cuda.is_available() else "cpu",
             compute_type="float16")
         self.diarization_model = Pipeline.from_pretrained(
-            "pyannote/speaker-diarization-3.0",
+            "pyannote/speaker-diarization-3.1",
             use_auth_token="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").to(
                 torch.device("cuda"))
 
