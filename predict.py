@@ -56,8 +56,9 @@ class Predictor(BasePredictor):
                                   ge=1,
                                   le=50,
                                   default=2),
-        prompt: str = Input(description="Prompt, to be used as context",
-                            default="Some people speaking."),
+        language: str = Input(description="Language of the spoken words as a language code like 'en'. Leave empty to auto detect language.",default=None),
+        prompt: str = Input(description="Prompt, provide names, acronyms and loanwords in a list. Use punctuation for best accuracy.",
+                            default="AI, Thomas, Audiogest."),
         offset_seconds: int = Input(
             description="Offset in seconds, used for chunked inputs",
             default=0,
@@ -109,7 +110,7 @@ class Predictor(BasePredictor):
 
             segments = self.speech_to_text(temp_wav_filename, num_speakers,
                                            prompt, offset_seconds,
-                                           group_segments)
+                                           group_segments, language)
 
             print(f'done with inference')
             # Return the results as a JSON object
@@ -131,14 +132,16 @@ class Predictor(BasePredictor):
                        num_speakers=2,
                        prompt="People takling.",
                        offset_seconds=0,
-                       group_segments=True):
+                       group_segments=True,
+                       language=None):
         time_start = time.time()
 
         # Transcribe audio
         print("Starting transcribing")
         options = dict(vad_filter=True,
                        initial_prompt=prompt,
-                       word_timestamps=True)
+                       word_timestamps=True,
+                       language=language)
         segments, _ = self.model.transcribe(audio_file_wav, **options)
         segments = list(segments)
         segments = [{
