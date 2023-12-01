@@ -51,7 +51,7 @@ class Predictor(BasePredictor):
         language: str = Input(description="Language of the spoken words as a language code like 'en'. Leave empty to auto detect language.",default=None),
         prompt: str = Input(description="Prompt, provide names, acronyms and loanwords in a list. Use punctuation for best accuracy.",
                             default="AI, Thomas, Audiogest."),
-        word_timestamps: bool = Input(description="Return word timestamps", default=True),
+        # word_timestamps: bool = Input(description="Return word timestamps", default=True), needs to be implemented
         offset_seconds: int = Input(
             description="Offset in seconds, used for chunked inputs",
             default=0,
@@ -103,7 +103,7 @@ class Predictor(BasePredictor):
 
             segments = self.speech_to_text(temp_wav_filename, num_speakers,
                                            prompt, offset_seconds,
-                                           group_segments, language, word_timestamps)
+                                           group_segments, language, word_timestamps=True)
 
             print(f'done with inference')
             # Return the results as a JSON object
