@@ -2,10 +2,14 @@
 
 Audio transcribing + diarization pipeline.
 
-Based on the Ctranslate version of Whisper Large v3 and Pyannote audio 3.1.
+## Models used
+- Whisper Large v3 (CTranslate 2 version `faster-whisper`) 
+- Pyannote audio 3.1.1
 
-- Use at [Replicate](https://replicate.com/thomasmol/whisper-diarization)
-- Or at [Audiogest](https://audiogest.app)
+## Usage
+- Used at [Audiogest](https://audiogest.app)
+- Or try yourself at [Replicate](https://replicate.com/thomasmol/whisper-diarization)
+    - Use the Replicate SDK to run the model
 
 ## Thanks to
 - [pyannote](https://github.com/pyannote/pyannote-audio)
