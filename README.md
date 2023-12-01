@@ -9,7 +9,6 @@ Audio transcribing + diarization pipeline.
 ## Usage
 - Used at [Audiogest](https://audiogest.app)
 - Or try yourself at [Replicate](https://replicate.com/thomasmol/whisper-diarization)
-    - Use the Replicate SDK to run the model
 
 ## Thanks to
 - [pyannote](https://github.com/pyannote/pyannote-audio)
