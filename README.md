@@ -8,7 +8,8 @@ Audio transcribing + diarization pipeline.
 
 ## Usage
 - Used at [Audiogest](https://audiogest.app)
-- Or try yourself at [Replicate](https://replicate.com/thomasmol/whisper-diarization)
+- Or try at [Replicate](https://replicate.com/thomasmol/whisper-diarization)
+- Or deploy yourself at [Replicate](https://replicate.com/) (Make sure to add your own HuggingFace API key)
 
 ## Thanks to
 - [pyannote](https://github.com/pyannote/pyannote-audio)

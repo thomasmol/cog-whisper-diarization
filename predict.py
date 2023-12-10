@@ -29,7 +29,7 @@ class Predictor(BasePredictor):
             compute_type="float16")
         self.diarization_model = Pipeline.from_pretrained(
             "pyannote/speaker-diarization-3.1",
-            use_auth_token="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").to(
+            use_auth_token="[YOUR HF TOKEN]").to(
                 torch.device("cuda"))
 
     def predict(
@@ -44,10 +44,10 @@ class Predictor(BasePredictor):
             description=
             "Group segments of same speaker shorter apart than 2 seconds",
             default=True),
-        num_speakers: int = Input(description="Number of speakers",
+        num_speakers: int = Input(description="Number of speakers, leave empty to autodetect.",
                                   ge=1,
                                   le=50,
-                                  default=2),
+                                  default=None),
         language: str = Input(description="Language of the spoken words as a language code like 'en'. Leave empty to auto detect language.",default=None),
         prompt: str = Input(description="Prompt, provide names, acronyms and loanwords in a list. Use punctuation for best accuracy.",
                             default="AI, Thomas, Audiogest."),
@@ -122,7 +122,7 @@ class Predictor(BasePredictor):
 
     def speech_to_text(self,
                        audio_file_wav,
-                       num_speakers=2,
+                       num_speakers=None,
                        prompt="People takling.",
                        offset_seconds=0,
                        group_segments=True,
@@ -156,8 +156,10 @@ class Predictor(BasePredictor):
         print(
             f"Finished with transcribing, took {time_transcribing_end - time_start:.5} seconds"
         )
+
         diarization = self.diarization_model(audio_file_wav,
                                              num_speakers=num_speakers)
+    
 
         time_diraization_end = time.time()
         print(
