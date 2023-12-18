@@ -16,6 +16,8 @@ from pyannote.audio import Pipeline
 
 class Output(BaseModel):
     segments: list
+    language: str = None
+    num_speakers: int = None
 
 
 class Predictor(BasePredictor):
@@ -29,7 +31,7 @@ class Predictor(BasePredictor):
             compute_type="float16")
         self.diarization_model = Pipeline.from_pretrained(
             "pyannote/speaker-diarization-3.1",
-            use_auth_token="[YOUR HF TOKEN]").to(
+            use_auth_token="YOUR HF TOKEN HERE").to(
                 torch.device("cuda"))
 
     def predict(
@@ -49,8 +51,7 @@ class Predictor(BasePredictor):
                                   le=50,
                                   default=None),
         language: str = Input(description="Language of the spoken words as a language code like 'en'. Leave empty to auto detect language.",default=None),
-        prompt: str = Input(description="Prompt, provide names, acronyms and loanwords in a list. Use punctuation for best accuracy.",
-                            default="AI, Thomas, Audiogest."),
+        prompt: str = Input(description="Vocabulary: provide names, acronyms and loanwords in a list. Use punctuation for best accuracy.",),
         # word_timestamps: bool = Input(description="Return word timestamps", default=True), needs to be implemented
         offset_seconds: int = Input(
             description="Offset in seconds, used for chunked inputs",
@@ -101,13 +102,13 @@ class Predictor(BasePredictor):
                 if os.path.exists(temp_audio_filename):
                     os.remove(temp_audio_filename)
 
-            segments = self.speech_to_text(temp_wav_filename, num_speakers,
+            segments, detected_num_speakers, detected_language  = self.speech_to_text(temp_wav_filename, num_speakers,
                                            prompt, offset_seconds,
                                            group_segments, language, word_timestamps=True)
 
             print(f'done with inference')
             # Return the results as a JSON object
-            return Output(segments=segments)
+            return Output(segments=segments, language=detected_language, num_speakers=detected_num_speakers)
 
         except Exception as e:
             raise RuntimeError("Error Running inference with local model", e)
@@ -123,7 +124,7 @@ class Predictor(BasePredictor):
     def speech_to_text(self,
                        audio_file_wav,
                        num_speakers=None,
-                       prompt="People takling.",
+                       prompt="Your, vocabulary, here. Use punctuation for best accuracy.",
                        offset_seconds=0,
                        group_segments=True,
                        language=None,
@@ -136,7 +137,7 @@ class Predictor(BasePredictor):
                        initial_prompt=prompt,
                        word_timestamps=word_timestamps,
                        language=language)
-        segments, _ = self.model.transcribe(audio_file_wav, **options)
+        segments, transcript_info = self.model.transcribe(audio_file_wav, **options)
         segments = list(segments)
         segments = [{
             'start':
@@ -160,7 +161,6 @@ class Predictor(BasePredictor):
         diarization = self.diarization_model(audio_file_wav,
                                              num_speakers=num_speakers)
     
-
         time_diraization_end = time.time()
         print(
             f"Finished with diarization, took {time_diraization_end - time_transcribing_end:.5} seconds"
@@ -173,6 +173,9 @@ class Predictor(BasePredictor):
         final_segments = []
 
         diarization_list = list(diarization.itertracks(yield_label=True))
+        unique_speakers = {speaker for _, _, speaker in diarization.itertracks(yield_label=True)}
+        detected_num_speakers = len(unique_speakers)
+
         speaker_idx = 0
         n_speakers = len(diarization_list)
 
@@ -272,4 +275,4 @@ class Predictor(BasePredictor):
 
         system_info = f"""Processing time: {time_diff:.5} seconds"""
         print(system_info)
-        return output
+        return output, detected_num_speakers, transcript_info.language
