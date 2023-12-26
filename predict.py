@@ -31,7 +31,7 @@ class Predictor(BasePredictor):
             compute_type="float16")
         self.diarization_model = Pipeline.from_pretrained(
             "pyannote/speaker-diarization-3.1",
-            use_auth_token="YOUR HF TOKEN HERE").to(
+            use_auth_token="YOUR TOKEN").to(
                 torch.device("cuda"))
 
     def predict(
@@ -51,7 +51,7 @@ class Predictor(BasePredictor):
                                   le=50,
                                   default=None),
         language: str = Input(description="Language of the spoken words as a language code like 'en'. Leave empty to auto detect language.",default=None),
-        prompt: str = Input(description="Vocabulary: provide names, acronyms and loanwords in a list. Use punctuation for best accuracy.",),
+        prompt: str = Input(description="Vocabulary: provide names, acronyms and loanwords in a list. Use punctuation for best accuracy.",default=None),
         # word_timestamps: bool = Input(description="Return word timestamps", default=True), needs to be implemented
         offset_seconds: int = Input(
             description="Offset in seconds, used for chunked inputs",
