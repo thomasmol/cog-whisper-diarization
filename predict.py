@@ -282,6 +282,7 @@ class Predictor(BasePredictor):
                 combined_text = "".join(segment_text)
                 cleaned_text = re.sub("  ", " ", combined_text).strip()
                 new_segment = {
+                    "avg_logprob": segment["avg_logprob"],
                     "start": segment_start - offset_seconds,
                     "end": segment_end - offset_seconds,
                     "speaker": speaker,
@@ -303,6 +304,7 @@ class Predictor(BasePredictor):
             "start": str(segments[0]["start"]),
             "end": str(segments[0]["end"]),
             "speaker": segments[0]["speaker"],
+            "avg_logprob": segments[0]["avg_logprob"],
         }
 
         if transcript_output_format in ("segments_only", "both"):
@@ -331,6 +333,7 @@ class Predictor(BasePredictor):
                     "start": str(segments[i]["start"]),
                     "end": str(segments[i]["end"]),
                     "speaker": segments[i]["speaker"],
+                    "avg_logprob": segments[i]["avg_logprob"],
                 }
                 if transcript_output_format in ("segments_only", "both"):
                     current_group["text"] = segments[i]["text"]
