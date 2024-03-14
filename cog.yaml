@@ -17,7 +17,7 @@ build:
 
   # a list of packages in the format <package-name>==<version>
   python_packages:
-     - "torch>=2.0.1+cu118"
+     - "torch==2.0.1"
      - "requests"
      - "pyannote.audio==3.1.1"
      - "faster-whisper==0.10.1"
