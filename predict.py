@@ -224,12 +224,15 @@ class Predictor(BasePredictor):
             f"Finished with transcribing, took {time_transcribing_end - time_start:.5} seconds"
         )
 
+        print("Starting diarization")
         diarization = self.diarization_model(audio_file_wav, num_speakers=num_speakers)
 
         time_diraization_end = time.time()
         print(
             f"Finished with diarization, took {time_diraization_end - time_transcribing_end:.5} seconds"
         )
+
+        print("Starting merging")
 
         # Initialize variables to keep track of the current position in both lists
         margin = 0.1  # 0.1 seconds margin
@@ -295,6 +298,8 @@ class Predictor(BasePredictor):
         print(
             f"Finished with merging, took {time_merging_end - time_diraization_end:.5} seconds"
         )
+
+        print("Starting cleaning")
         segments = final_segments
         # Make output
         output = []  # Initialize an empty list for the output
