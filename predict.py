@@ -12,6 +12,7 @@ import re
 from cog import BasePredictor, BaseModel, Input, File, Path
 from faster_whisper import WhisperModel
 from pyannote.audio import Pipeline
+import torchaudio
 
 
 class Output(BaseModel):
@@ -226,7 +227,11 @@ class Predictor(BasePredictor):
         )
 
         print("Starting diarization")
-        diarization = self.diarization_model(audio_file_wav, num_speakers=num_speakers)
+        waveform, sample_rate = torchaudio.load(audio_file_wav)
+        diarization = self.diarization_model(
+            {"waveform": waveform, "sample_rate": sample_rate},
+            num_speakers=num_speakers,
+        )
 
         time_diraization_end = time.time()
         print(
