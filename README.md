@@ -4,8 +4,8 @@ Audio transcribing + diarization pipeline.
 
 ## Models used
 
-- Whisper Large v3 (CTranslate 2 version `faster-whisper`)
-- Pyannote audio 3.1.1
+- Whisper Large v3 (CTranslate 2 version `faster-whisper==1.0.3`)
+- Pyannote audio 3.3.1
 
 ## Usage
 
@@ -21,7 +21,7 @@ Audio transcribing + diarization pipeline.
 - `group_segments: bool`: Group segments of the same speaker shorter than 2 seconds apart. Default is `True`.
 - `num_speakers: int`: Number of speakers. Leave empty to autodetect. Must be between 1 and 50.
 - `language: str`: Language of the spoken words as a language code like 'en'. Leave empty to auto detect language.
-- `prompt: str`: Vocabulary: provide names, acronyms, and loanwords in a list. Use punctuation for best accuracy.
+- `prompt: str`: Vocabulary: provide names, acronyms, and loanwords in a list. Use punctuation for best accuracy. Also now used as 'hotwords' paramater in transcribing,
 - `offset_seconds: int`: Offset in seconds, used for chunked inputs. Default is 0.
 - `transcript_output_format: str`: Specify the format of the transcript output: individual words with timestamps, full text of segments, or a combination of both.
   - Default is `both`.
