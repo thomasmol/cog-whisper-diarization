@@ -1,0 +1,6 @@
+torch>=2.0.1
+requests
+pyannote.audio>=3.3.1
+faster-whisper>=1.0.3
+torchvision>=0.15.2
+torchtext>=0.15.2

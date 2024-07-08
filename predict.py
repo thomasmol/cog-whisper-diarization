@@ -32,7 +32,7 @@ class Predictor(BasePredictor):
         )
         self.diarization_model = Pipeline.from_pretrained(
             "pyannote/speaker-diarization-3.1",
-            use_auth_token="YOUR HF TOKEN HERE",
+            use_auth_token="YOUR HF TOKEN",
         ).to(torch.device("cuda"))
 
     def predict(
@@ -197,6 +197,7 @@ class Predictor(BasePredictor):
             initial_prompt=prompt,
             word_timestamps=word_timestamps,
             language=language,
+            hotwords=prompt
         )
         segments, transcript_info = self.model.transcribe(audio_file_wav, **options)
         segments = list(segments)
@@ -306,8 +307,8 @@ class Predictor(BasePredictor):
 
         # Initialize the first group with the first segment
         current_group = {
-            "start": str(segments[0]["start"]),
-            "end": str(segments[0]["end"]),
+            "start": segments[0]["start"],
+            "end": segments[0]["end"],
             "speaker": segments[0]["speaker"],
             "avg_logprob": segments[0]["avg_logprob"],
         }
@@ -324,7 +325,7 @@ class Predictor(BasePredictor):
             # If the current segment's speaker is the same as the previous segment's speaker,
             # and the time gap is less than or equal to 2 seconds, group them
             if segments[i]["speaker"] == segments[i - 1]["speaker"] and time_gap <= 2 and group_segments:
-                current_group["end"] = str(segments[i]["end"])
+                current_group["end"] = segments[i]["end"]
                 if transcript_output_format in ("segments_only", "both"):
                     current_group["text"] += " " + segments[i]["text"]
                 if transcript_output_format in ("words_only", "both"):
@@ -335,8 +336,8 @@ class Predictor(BasePredictor):
 
                 # Start a new group with the current segment
                 current_group = {
-                    "start": str(segments[i]["start"]),
-                    "end": str(segments[i]["end"]),
+                    "start": segments[i]["start"],
+                    "end": segments[i]["end"],
                     "speaker": segments[i]["speaker"],
                     "avg_logprob": segments[i]["avg_logprob"],
                 }
