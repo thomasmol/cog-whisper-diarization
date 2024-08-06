@@ -60,6 +60,10 @@ class Predictor(BasePredictor):
             le=50,
             default=None,
         ),
+        translate: bool = Input(
+            description="Translate the speech into English.",
+            default=False,
+        ),
         language: str = Input(
             description="Language of the spoken words as a language code like 'en'. Leave empty to auto detect language.",
             default=None,
@@ -156,6 +160,7 @@ class Predictor(BasePredictor):
                 language,
                 word_timestamps=True,
                 transcript_output_format=transcript_output_format,
+                translate=translate,
             )
 
             print(f"done with inference")
@@ -187,6 +192,7 @@ class Predictor(BasePredictor):
         language=None,
         word_timestamps=True,
         transcript_output_format="both",
+        translate=False,
     ):
         time_start = time.time()
 
@@ -198,6 +204,7 @@ class Predictor(BasePredictor):
             initial_prompt=prompt,
             word_timestamps=word_timestamps,
             language=language,
+            task="translate" if translate else "transcribe",
             hotwords=prompt
         )
         segments, transcript_info = self.model.transcribe(audio_file_wav, **options)
