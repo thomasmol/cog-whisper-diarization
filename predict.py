@@ -230,7 +230,7 @@ class Predictor(BasePredictor):
 
         time_transcribing_end = time.time()
         print(
-            f"Finished with transcribing, took {time_transcribing_end - time_start:.5} seconds"
+            f"Finished with transcribing, took {time_transcribing_end - time_start:.5} seconds, {len(segments)} segments"
         )
 
         print("Starting diarization")
@@ -309,8 +309,12 @@ class Predictor(BasePredictor):
 
         time_merging_end = time.time()
         print(
-            f"Finished with merging, took {time_merging_end - time_diraization_end:.5} seconds"
+            f"Finished with merging, took {time_merging_end - time_diraization_end:.5} seconds, {len(final_segments)} segments, {detected_num_speakers} speakers"
         )
+
+        # Check if final_segments is empty
+        if not final_segments:
+            return [], detected_num_speakers, transcript_info.language
 
         print("Starting cleaning")
         segments = final_segments
