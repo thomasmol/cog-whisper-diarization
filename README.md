@@ -19,10 +19,11 @@ Audio transcribing + diarization pipeline.
 - Accept [pyannote/speaker-diarization-3.1](https://hf.co/pyannote/speaker-diarization-3.1) user conditions
 - Create HuggingFace token at [hf.co/settings/tokens](https://hf.co/settings/tokens).
 - Insert your own HuggingFace token in `predict.py` in the `setup` function
-- (Be careful not to commit this token!)
+  - (Be careful not to commit this token!)
 - Run `cog build`
 - Run `cog predict -i input.wav`
-- Or push to Replicate with `cog push r8.im/<username>/<name>`
+  - Or push to Replicate with `cog push r8.im/<username>/<name>`
+- Please follow instructions on [cog.run](https://cog.run) if you run into issues
 
 ### Input
 
@@ -48,7 +49,7 @@ Audio transcribing + diarization pipeline.
 
 ## Thanks to
 
-- [pyannote](https://github.com/pyannote/pyannote-audio)
-- [faster-whisper](https://github.com/SYSTRAN/faster-whisper)
-- [whisper](https://github.com/openai/whisper)
-- [cog](https://github.com/replicate/cog)
+- [pyannote](https://github.com/pyannote/pyannote-audio) - Speaker diarization model
+- [whisper](https://github.com/openai/whisper) - Speech recognition model
+- [faster-whisper](https://github.com/SYSTRAN/faster-whisper) - Reimplementation of Whisper model for faster inference
+- [cog](https://github.com/replicate/cog) - ML containerization framework
