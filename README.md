@@ -2,16 +2,27 @@
 
 Audio transcribing + diarization pipeline.
 
-## Models used
+## AI/ML Models used
 
 - Whisper Large v3 (CTranslate 2 version `faster-whisper==1.0.3`)
 - Pyannote audio 3.3.1
 
 ## Usage
 
-- Used at [Audiogest](https://audiogest.app)
+- Used at [Audiogest](https://audiogest.app) and [Spectropic](https://spectropic.ai)
 - Or try at [Replicate](https://replicate.com/thomasmol/whisper-diarization)
-- Or deploy yourself at [Replicate](https://replicate.com/) (Make sure to add your own HuggingFace API key and accept the terms of use of the pyannote models used)
+- Or deploy yourself on [Replicate](https://replicate.com/) or any machine with a GPU 
+
+## Deploy
+- Make sure you have [cog](https://cog.run) installed
+- Accept [pyannote/segmentation-3.0](https://hf.co/pyannote/segmentation-3.0) user conditions
+- Accept [pyannote/speaker-diarization-3.1](https://hf.co/pyannote/speaker-diarization-3.1) user conditions
+- Create HuggingFace token at [hf.co/settings/tokens](https://hf.co/settings/tokens).
+- Insert your own HuggingFace token in `predict.py` in the `setup` function
+- (Be careful not to commit this token!)
+- Run `cog build`
+- Run `cog predict -i input.wav`
+- Or push to Replicate with `cog push r8.im/<username>/<name>`
 
 ### Input
 
@@ -40,3 +51,4 @@ Audio transcribing + diarization pipeline.
 - [pyannote](https://github.com/pyannote/pyannote-audio)
 - [faster-whisper](https://github.com/SYSTRAN/faster-whisper)
 - [whisper](https://github.com/openai/whisper)
+- [cog](https://github.com/replicate/cog)
