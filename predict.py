@@ -47,10 +47,6 @@ class Predictor(BasePredictor):
             description="Or provide: A direct audio file URL", default=None
         ),
         file: Path = Input(description="Or an audio file", default=None),
-        group_segments: bool = Input(
-            description="Group segments of same speaker shorter apart than 2 seconds",
-            default=True,
-        ),
         num_speakers: int = Input(
             description="Number of speakers, leave empty to autodetect.",
             ge=1,
