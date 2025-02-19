@@ -4,7 +4,7 @@ Audio transcribing + diarization pipeline.
 
 ## AI/ML Models used
 
-- Whisper Large v3 (CTranslate 2 version `faster-whisper==1.0.3`)
+- Whisper Large v3 Turbo (CTranslate 2 version `faster-whisper==1.1.1`)
 - Pyannote audio 3.3.1
 
 ## Usage
@@ -30,15 +30,10 @@ Audio transcribing + diarization pipeline.
 - `file_string: str`: Either provide a Base64 encoded audio file.
 - `file_url: str`: Or provide a direct audio file URL.
 - `file: Path`: Or provide an audio file.
-- `group_segments: bool`: Group segments of the same speaker shorter than 2 seconds apart. Default is `True`.
 - `num_speakers: int`: Number of speakers. Leave empty to autodetect. Must be between 1 and 50.
 - `translate: bool`: Translate the speech into English.
 - `language: str`: Language of the spoken words as a language code like 'en'. Leave empty to auto detect language.
 - `prompt: str`: Vocabulary: provide names, acronyms, and loanwords in a list. Use punctuation for best accuracy. Also now used as 'hotwords' paramater in transcribing,
-- `offset_seconds: int`: Offset in seconds, used for chunked inputs. Default is 0.
-- `transcript_output_format: str`: Specify the format of the transcript output: individual words with timestamps, full text of segments, or a combination of both.
-  - Default is `both`.
-  - Options are `words_only`, `segments_only`, `both`,
 
 ### Output
 

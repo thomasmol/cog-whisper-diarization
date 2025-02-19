@@ -9,6 +9,7 @@ build:
   system_packages:
     - "ffmpeg"
     - "libmagic1"
+    - "cudnn9-cuda-12"
     # - "libgl1-mesa-glx"
     # - "libglib2.0-0"
 
@@ -16,7 +17,6 @@ build:
   python_version: "3.10"
 
   python_requirements: requirements.txt
-
 
   # commands run after the environment is setup
   run:
