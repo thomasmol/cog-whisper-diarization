@@ -19,6 +19,7 @@ def handler(job):
         "segments": output.segments,
         "language": output.language,
         "num_speakers": output.num_speakers,
+        "speakers": output.speakers or {},
     }
 
 runpod.serverless.start({"handler": handler})

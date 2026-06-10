@@ -6,6 +6,7 @@ import requests
 import time
 import torch
 import re
+import numpy as np
 
 from cog import BasePredictor, BaseModel, Input, Path
 from faster_whisper import WhisperModel, BatchedInferencePipeline
@@ -14,10 +15,20 @@ import torchaudio
 from faster_whisper.vad import VadOptions
 from huggingface_hub import login
 
+# pyannote/speaker-diarization-3.1 uses wespeaker embeddings (256-d). Stamped on
+# every centroid so a future diarization-model swap is detectable downstream.
+VOICEPRINT_MODEL = "pyannote-speaker-diarization-3.1"
+
+
 class Output(BaseModel):
     segments: list
     language: str = None
     num_speakers: int = None
+    # Per-speaker voiceprint centroids for the cross-file identity layer:
+    #   {SPEAKER_xx: {embedding: [float], dim, model_version, duration_s, segment_count}}
+    # One mean centroid per speaker per file (pyannote return_embeddings=True).
+    # Empty dict when diarization produced no usable embeddings.
+    speakers: dict = None
 
 class Predictor(BasePredictor):
     def setup(self):
@@ -80,7 +91,7 @@ class Predictor(BasePredictor):
             ], check=True, capture_output=True)
 
             # 2. INFERENCE
-            segments, detected_speakers, detected_lang = self.speech_to_text(
+            segments, detected_speakers, detected_lang, speaker_voiceprints = self.speech_to_text(
                 temp_wav_filename, num_speakers, prompt, language, translate
             )
 
@@ -88,6 +99,7 @@ class Predictor(BasePredictor):
                 segments=segments,
                 language=detected_lang,
                 num_speakers=detected_speakers,
+                speakers=speaker_voiceprints,
             )
 
         finally:
@@ -119,9 +131,15 @@ class Predictor(BasePredictor):
         whisper_segments = list(whisper_segments)
         t_transcribe = time.time() - t_start
 
-        # DIARIZATION
+        # DIARIZATION (+ per-speaker voiceprint centroids for cross-file identity)
+        # return_embeddings=True makes pyannote also return one mean embedding per
+        # speaker cluster, aligned (by row) with sorted diarization.labels().
         waveform, sample_rate = torchaudio.load(audio_path)
-        diarization = self.diarization_model({"waveform": waveform, "sample_rate": sample_rate}, num_speakers=num_speakers)
+        diarization, speaker_embeddings = self.diarization_model(
+            {"waveform": waveform, "sample_rate": sample_rate},
+            num_speakers=num_speakers,
+            return_embeddings=True,
+        )
         t_diarize = time.time() - (t_start + t_transcribe)
 
         # 3. LINEAR MERGE (O(N) Complexity - No Pandas!)
@@ -208,5 +226,49 @@ class Predictor(BasePredictor):
             g["text"] = re.sub(r"\s+", " ", g["text"]).strip()
             g["duration"] = g["end"] - g["start"]
 
+        # 5. VOICEPRINT CENTROIDS (one mean embedding per speaker per file)
+        speaker_voiceprints = self._build_speaker_voiceprints(
+            diarization, speaker_embeddings, final_segments
+        )
+
         print(f"Transcribe: {t_transcribe:.2f}s | Diarize: {t_diarize:.2f}s | Total: {time.time()-t_start:.2f}s")
-        return grouped, unique_speakers, info.language
+        return grouped, unique_speakers, info.language, speaker_voiceprints
+
+    @staticmethod
+    def _build_speaker_voiceprints(diarization, speaker_embeddings, final_segments):
+        """Map pyannote's per-speaker mean embeddings to a serializable dict.
+
+        pyannote (return_embeddings=True) yields an (n_speakers, dim) array whose
+        rows align with sorted ``diarization.labels()``. Speakers with too little
+        speech can have NaN/empty embeddings; those are skipped so we never store
+        a poisoned centroid. ``duration_s``/``segment_count`` come from the
+        whisper-aligned segments and act as a quality signal downstream.
+        """
+        voiceprints = {}
+        if speaker_embeddings is None:
+            return voiceprints
+
+        labels = list(diarization.labels())
+        for idx, label in enumerate(labels):
+            if idx >= len(speaker_embeddings):
+                continue
+            emb = np.asarray(speaker_embeddings[idx], dtype=float)
+            if emb.size == 0 or not np.all(np.isfinite(emb)):
+                # Too little speech to embed reliably -> degrade to text-only.
+                continue
+            voiceprints[label] = {
+                "embedding": [float(x) for x in emb.tolist()],
+                "dim": int(emb.shape[-1]),
+                "model_version": VOICEPRINT_MODEL,
+                "duration_s": 0.0,
+                "segment_count": 0,
+            }
+
+        for seg in final_segments:
+            sp = seg.get("speaker")
+            vp = voiceprints.get(sp)
+            if vp is not None:
+                vp["duration_s"] += float(seg.get("end", 0.0)) - float(seg.get("start", 0.0))
+                vp["segment_count"] += 1
+
+        return voiceprints
