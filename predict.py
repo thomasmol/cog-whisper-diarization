@@ -7,8 +7,13 @@ import requests
 import time
 import torch
 import re
+from typing import Optional
 import pandas as pd
 import numpy as np
+
+# pyannote.audio 4 collects anonymous usage telemetry by default. Opt out before it
+# is imported below (the flag is read at import time).
+os.environ.setdefault("PYANNOTE_METRICS_ENABLED", "false")
 
 from cog import BasePredictor, BaseModel, Input, Path
 from faster_whisper import WhisperModel
@@ -33,21 +38,30 @@ class Predictor(BasePredictor):
             device="cuda",
             compute_type="float16",
         )
+        # Read the HF access token from a gitignored .hf_token file if present, so the
+        # token is baked into your private image without being committed; otherwise
+        # replace the placeholder below with your token.
+        _tok_path = os.path.join(os.path.dirname(__file__), ".hf_token")
+        _hf_token = (
+            open(_tok_path).read().strip()
+            if os.path.exists(_tok_path)
+            else "YOUR HF TOKEN"
+        )
         self.diarization_model = Pipeline.from_pretrained(
-            "pyannote/speaker-diarization-3.1",
-            use_auth_token="YOUR HF TOKEN",
+            "pyannote/speaker-diarization-community-1",
+            token=_hf_token,
         ).to(torch.device("cuda"))
 
     def predict(
         self,
-        file_string: str = Input(
+        file_string: Optional[str] = Input(
             description="Either provide: Base64 encoded audio file,", default=None
         ),
-        file_url: str = Input(
+        file_url: Optional[str] = Input(
             description="Or provide: A direct audio file URL", default=None
         ),
-        file: Path = Input(description="Or an audio file", default=None),
-        num_speakers: int = Input(
+        file: Optional[Path] = Input(description="Or an audio file", default=None),
+        num_speakers: Optional[int] = Input(
             description="Number of speakers, leave empty to autodetect.",
             ge=1,
             le=50,
@@ -57,11 +71,11 @@ class Predictor(BasePredictor):
             description="Translate the speech into English.",
             default=False,
         ),
-        language: str = Input(
+        language: Optional[str] = Input(
             description="Language of the spoken words as a language code like 'en'. Leave empty to auto detect language.",
             default=None,
         ),
-        prompt: str = Input(
+        prompt: Optional[str] = Input(
             description="Vocabulary: provide names, acronyms and loanwords in a list. Use punctuation for best accuracy.",
             default=None,
         ),
@@ -223,9 +237,12 @@ class Predictor(BasePredictor):
 
         print("Starting diarization")
         waveform, sample_rate = torchaudio.load(audio_file_wav)
+        diarization_kwargs = {}
+        if num_speakers is not None:
+            diarization_kwargs["num_speakers"] = num_speakers
         diarization = self.diarization_model(
             {"waveform": waveform, "sample_rate": sample_rate},
-            num_speakers=num_speakers,
+            **diarization_kwargs,
         )
 
         time_diraization_end = time.time()
@@ -237,7 +254,11 @@ class Predictor(BasePredictor):
 
         # Convert diarization list to DataFrame
         diarize_segments = []
-        diarization_list = list(diarization.itertracks(yield_label=True))
+        # pyannote.audio 4.x returns an output object whose Annotation lives on
+        # .speaker_diarization (3.x returned the Annotation directly).
+        diarization_list = list(
+            diarization.speaker_diarization.itertracks(yield_label=True)
+        )
 
         for turn, _, speaker in diarization_list:
             diarize_segments.append(

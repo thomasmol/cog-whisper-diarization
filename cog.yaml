@@ -9,7 +9,6 @@ build:
   system_packages:
     - "ffmpeg"
     - "libmagic1"
-    - "cudnn9-cuda-12"
     # - "libgl1-mesa-glx"
     # - "libglib2.0-0"
 
@@ -20,8 +19,12 @@ build:
 
   # commands run after the environment is setup
   run:
-    - "echo env is ready!"
-    # - "echo another command if needed"
+    # faster-whisper/ctranslate2 needs cuDNN at runtime. torch ships it as a pip
+    # package (nvidia-cudnn-cu12); register those lib dirs so ctranslate2 finds them.
+    - "find /root/.pyenv -type d -path '*/site-packages/nvidia/*/lib' > /etc/ld.so.conf.d/zzz_nvidia.conf && ldconfig && echo 'registered nvidia/cudnn libs for ctranslate2'"
+    # hf-xet's download backend can fail behind some container networks; remove it so
+    # huggingface_hub falls back to classic HTTPS downloads.
+    - "pip uninstall -y hf-xet 2>/dev/null || python -m pip uninstall -y hf-xet 2>/dev/null || true; echo 'hf-xet removed (classic HF downloads)'"
 
 # predict.py defines how predictions are run on your model
 predict: "predict.py:Predictor"

@@ -4,8 +4,8 @@ Audio transcribing + diarization pipeline.
 
 ## AI/ML Models used
 
-- Whisper Large v3 Turbo (CTranslate 2 version `faster-whisper==1.1.1`)
-- Pyannote audio 3.3.1
+- Whisper Large v3 Turbo (CTranslate 2 version `faster-whisper==1.2.1`)
+- Pyannote `speaker-diarization-community-1` (`pyannote.audio>=4.0`)
 
 ## Usage
 
@@ -15,10 +15,9 @@ Audio transcribing + diarization pipeline.
 
 ## Deploy
 - Make sure you have [cog](https://cog.run) installed
-- Accept [pyannote/segmentation-3.0](https://hf.co/pyannote/segmentation-3.0) user conditions
-- Accept [pyannote/speaker-diarization-3.1](https://hf.co/pyannote/speaker-diarization-3.1) user conditions
+- Accept [pyannote/speaker-diarization-community-1](https://hf.co/pyannote/speaker-diarization-community-1) user conditions
 - Create HuggingFace token at [hf.co/settings/tokens](https://hf.co/settings/tokens).
-- Insert your own HuggingFace token in `predict.py` in the `setup` function
+- Provide your HuggingFace token either by adding a `.hf_token` file in the project root (gitignored), or by replacing the `YOUR HF TOKEN` placeholder in the `setup` function of `predict.py`
   - (Be careful not to commit this token!)
 - Run `cog build`
 - Run `cog predict -i input.wav`
