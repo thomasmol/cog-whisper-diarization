@@ -2,27 +2,41 @@
 
 Audio transcribing + diarization pipeline.
 
-## AI/ML Models used
+## AI Models used
 
-- Whisper Large v3 Turbo (CTranslate 2 version `faster-whisper==1.1.1`)
-- Pyannote audio 3.3.1
+- Transcription: Faster Whisper Large v3 Turbo (`faster-whisper==1.2.1`)
+- Diarization: `pyannote/speaker-diarization-community-1` (`pyannote.audio==4.0.4`)
 
 ## Usage
 
-- Used at [Audiogest](https://audiogest.app) and [Spectropic](https://spectropic.ai)
+- Used at [Audiogest](https://audiogest.app)
 - Or try at [Replicate](https://replicate.com/thomasmol/whisper-diarization)
-- Or deploy yourself on [Replicate](https://replicate.com/) or any machine with a GPU 
+- Or use a similar version with better diarization at [pyannoteAI](https://www.pyannote.ai/)
+- Or build locally with [Cog](https://cog.run) and deploy on [Replicate](https://replicate.com/)
 
 ## Deploy
+
 - Make sure you have [cog](https://cog.run) installed
-- Accept [pyannote/segmentation-3.0](https://hf.co/pyannote/segmentation-3.0) user conditions
-- Accept [pyannote/speaker-diarization-3.1](https://hf.co/pyannote/speaker-diarization-3.1) user conditions
-- Create HuggingFace token at [hf.co/settings/tokens](https://hf.co/settings/tokens).
-- Insert your own HuggingFace token in `predict.py` in the `setup` function
-  - (Be careful not to commit this token!)
-- Run `cog build`
-- Run `cog predict -i input.wav`
-  - Or push to Replicate with `cog push r8.im/<username>/<name>`
+- Accept [pyannote/speaker-diarization-community-1](https://hf.co/pyannote/speaker-diarization-community-1) user conditions
+- Create a Hugging Face read token at [hf.co/settings/tokens](https://hf.co/settings/tokens) and write it to a local secret file: `.hf_token`
+- Then build:
+
+```sh
+cog build -t whisper-diarization:latest --secret id=HF_TOKEN,src=.hf_token
+```
+
+- Run:
+
+```sh
+cog run -i file=@input.wav
+```
+
+- Push to Replicate:
+
+```sh
+cog push r8.im/<username>/<name>
+```
+
 - Please follow instructions on [cog.run](https://cog.run) if you run into issues
 
 ### Input
@@ -33,7 +47,7 @@ Audio transcribing + diarization pipeline.
 - `num_speakers: int`: Number of speakers. Leave empty to autodetect. Must be between 1 and 50.
 - `translate: bool`: Translate the speech into English.
 - `language: str`: Language of the spoken words as a language code like 'en'. Leave empty to auto detect language.
-- `prompt: str`: Vocabulary: provide names, acronyms, and loanwords in a list. Use punctuation for best accuracy. Also now used as 'hotwords' paramater in transcribing,
+- `prompt: str`: Vocabulary: provide names, acronyms, and loanwords in a list. Use punctuation for best accuracy.
 
 ### Output
 
