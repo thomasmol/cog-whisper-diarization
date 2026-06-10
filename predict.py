@@ -73,6 +73,11 @@ class Runner(BaseRunner):
             default=None,
         ),
     ) -> Output:
+        if file_string == "":
+            file_string = None
+        if file_url == "":
+            file_url = None
+
         inputs = [file_string is not None, file_url is not None, file is not None]
         if sum(inputs) != 1:
             raise RuntimeError("Provide exactly one of file_string, file_url, or file")
