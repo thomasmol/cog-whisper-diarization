@@ -34,7 +34,7 @@ cog run -i file=@input.wav
 - Push to Replicate:
 
 ```sh
-cog push r8.im/<username>/<name> --secret id=HF_TOKEN,src=.hf_token
+cog push r8.im/<username>/<name>
 ```
 
 - Please follow instructions on [cog.run](https://cog.run) if you run into issues
